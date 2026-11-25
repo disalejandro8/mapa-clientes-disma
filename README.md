@@ -26,7 +26,7 @@ El mapa se publica como app web de Google Apps Script, que pide iniciar sesión 
 3. **+ Archivos → HTML**, nombre `index` (sin .html), y pegar el contenido de `apps_script/index.html`.
 4. **Implementar → Nueva implementación → Tipo: App web**.
    - Ejecutar como: **Usuario que accede a la app web**.
-   - Quién tiene acceso: **Cualquier usuario de dismitre.com.ar** (o "Cualquier usuario con cuenta de Google").
+   - Quién tiene acceso: **Cualquier usuario con cuenta de Google** (hace falta para cuentas de fuera de dismitre.com.ar, como Gmail). Igual solo entran las cuentas de `PERMITIDOS`.
 5. Autorizar los permisos que pide Google y copiar la **URL de la app web**: ese es el link para el equipo.
 
 Para dar acceso a otra persona: agregar su mail en `PERMITIDOS` y hacer **Implementar → Administrar implementaciones → Editar → Versión nueva**.

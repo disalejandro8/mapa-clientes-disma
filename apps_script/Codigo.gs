@@ -5,7 +5,8 @@
  */
 const PERMITIDOS = [
   'arodriguez@dismitre.com.ar',
-  'ppaez@dismitre.com.ar'
+  'ppaez@dismitre.com.ar',
+  'disalejandro@gmail.com'
 ];
 
 function doGet() {
