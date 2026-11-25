@@ -1,5 +1,10 @@
 # Mapa de clientes Disma
 
+**Link para entrar (login con Google):** https://script.google.com/macros/s/AKfycbzjZx6uqqpowzzUW9JYnkdCgS3P-AF1HjvgjDDFi3H7UYp5nYyLhMfU9vyf1s8RqI9AOQ/exec
+
+Cuentas con acceso: arodriguez@dismitre.com.ar, ppaez@dismitre.com.ar, disalejandro@gmail.com.
+La primera vez Google pide autorizar la app ("Revisar permisos" → Configuración avanzada → Ir a Mapa clientes Disma).
+
 Herramienta para cortar la base de clientes de Disma por zonas, asignar vendedor, equipo y día de visita, y bajar el resultado a Excel.
 
 ## Cómo se usa
