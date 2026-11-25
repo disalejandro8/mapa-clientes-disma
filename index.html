@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de clientes Disma · Asignación de vendedores</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>window.type = true; /* compatibilidad Leaflet.draw */</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root { --borde:#d9dde3; --texto:#1f2933; --suave:#6b7280; --fondo:#f6f7f9; --acento:#1f3864; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: Arial, Helvetica, sans-serif; font-size:13px; color:var(--texto); }
+  #app { display:grid; grid-template-columns: 330px 1fr 340px; height:100vh; }
+  aside { overflow-y:auto; background:var(--fondo); border-right:1px solid var(--borde); padding:10px 12px; }
+  aside.der { border-right:none; border-left:1px solid var(--borde); }
+  #mapa { height:100%; }
+  h1 { font-size:15px; margin:2px 0 8px; color:var(--acento); }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); margin:14px 0 6px; border-top:1px solid var(--borde); padding-top:10px; }
+  label { cursor:pointer; }
+  .fila { display:flex; align-items:center; gap:6px; margin:3px 0; }
+  .fila .cnt { margin-left:auto; color:var(--suave); font-variant-numeric: tabular-nums; }
+  .punto { width:11px; height:11px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.35); flex:none; }
+  select, input[type=text], input[type=search] { width:100%; padding:5px 6px; border:1px solid var(--borde); border-radius:4px; font:inherit; background:#fff; }
+  button { font:inherit; padding:6px 10px; border:1px solid var(--borde); background:#fff; border-radius:4px; cursor:pointer; }
+  button.prim { background:var(--acento); color:#fff; border-color:var(--acento); }
+  button.peligro { color:#b42318; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .botones { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .lista-partidos { max-height:190px; overflow-y:auto; background:#fff; border:1px solid var(--borde); border-radius:4px; padding:4px 6px; }
+  .mini { font-size:11px; color:var(--suave); }
+  .kpi { background:#fff; border:1px solid var(--borde); border-radius:6px; padding:8px 10px; margin:6px 0; }
+  .kpi b { font-size:16px; }
+  .dias { display:flex; gap:4px; flex-wrap:wrap; }
+  .dias label { border:1px solid var(--borde); background:#fff; border-radius:4px; padding:3px 6px; }
+  .dias input { margin:0 3px 0 0; }
+  table { width:100%; border-collapse:collapse; background:#fff; }
+  th, td { border-bottom:1px solid var(--borde); padding:4px 5px; text-align:left; font-size:12px; }
+  th { background:#eef1f5; position:sticky; top:0; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  tr.clic { cursor:pointer; }
+  tr.clic:hover { background:#f1f5ff; }
+  .tabla-wrap { max-height:260px; overflow-y:auto; border:1px solid var(--borde); border-radius:4px; }
+  #carga { position:fixed; inset:0; background:rgba(246,247,249,.97); display:flex; align-items:center; justify-content:center; z-index:2000; }
+  #carga .caja { background:#fff; border:2px dashed #9aa5b1; border-radius:10px; padding:28px 34px; max-width:560px; text-align:center; }
+  #carga .caja.sobre { border-color:var(--acento); background:#f1f5ff; }
+  #aviso { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:#1f2933; color:#fff; padding:8px 14px; border-radius:6px; z-index:3000; display:none; max-width:70vw; }
+  .leaflet-popup-content { font-size:12px; line-height:1.4; min-width:220px; }
+  .leaflet-popup-content b { color:var(--acento); }
+  .etq-cuad { background:rgba(255,255,255,.85); border:1px solid #9ca3af; box-shadow:none; font-weight:bold; font-size:11px; padding:1px 5px; }
+  .capa-sel { display:flex; gap:6px; align-items:center; }
+  .capa-sel select { flex:1; }
+  .lista-cuad { margin-top:6px; max-height:190px; overflow:auto; border:1px solid var(--borde); border-radius:4px; }
+  .lista-cuad .it { display:flex; gap:4px; align-items:center; padding:3px 5px; border-bottom:1px solid #eef0f3; }
+  .lista-cuad .it input { flex:1; min-width:0; padding:2px 4px; font-size:12px; }
+  .lista-cuad .it button { padding:2px 6px; font-size:11px; }
+  .lista-cuad .it .sw { width:10px; height:10px; border-radius:2px; flex:none; }
+  .lista-cuad .it .n { font-size:11px; color:#6b7280; width:42px; text-align:right; flex:none; }
+  .etq-partido { background:transparent; border:none; box-shadow:none; color:#4b5563; font-weight:bold; font-size:11px; text-shadow:0 0 3px #fff,0 0 3px #fff; }
+  .modo label { margin-right:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1>Mapa de clientes · Disma <span style="font-size:11px;color:#6b7280;font-weight:400">v14</span></h1>
+    <div class="mini" id="archivoInfo">Sin archivo cargado</div>
+    <div class="botones">
+      <button id="btnOtroArchivo">Cargar otro archivo</button>
+    </div>
+
+    <h2>Categoría</h2>
+    <div id="fCategorias"></div>
+
+    <h2>Acción</h2>
+    <div id="fAcciones"></div>
+
+    <h2>Partido</h2>
+    <div class="botones" style="margin:0 0 4px"><button id="pTodos">Todos</button><button id="pNinguno">Ninguno</button></div>
+    <div class="lista-partidos" id="fPartidos"></div>
+
+    <h2>Otros filtros</h2>
+    <div class="fila" style="display:block">Vendedor Disma actual<select id="fVendActual"></select></div>
+    <div class="fila" style="display:block">Asignación<select id="fAsig">
+      <option value="">Todos</option><option value="sin">Sin asignar</option><option value="con">Asignados</option></select></div>
+    <div class="fila" style="display:block">Vendedor asignado<select id="fVendAsig"></select></div>
+    <div class="fila" style="display:block">Día de visita<select id="fDia"></select></div>
+    <div class="fila" style="display:block">Equipo<select id="fEquipo"></select></div>
+    <div class="fila" style="display:block">Clase autoservicio (por compra)<select id="fClase"><option value="">Todas</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="AB">A y B</option></select></div>
+    <div class="mini" id="avisoClase" style="display:none;color:#b42318">El archivo cargado no tiene la columna clase_autoservicio: bajá de nuevo la base de BigQuery.</div>
+    <div class="fila"><label style="color:#c2410c;font-weight:600"><input type="checkbox" id="fRevisar"> Solo ubicaciones a revisar (<span id="nRevisar">0</span>)</label></div>
+    <div class="mini" style="margin:-4px 0 8px">Clientes cuyo punto cae fuera de su partido o en otro distrito (ej. Capital). Se ven con borde naranja. Abrí el punto y usá "Corregir ubicación".</div>
+    <div class="fila" style="display:block">Buscar (nombre, código, dirección)<input type="search" id="fTexto" placeholder="Escribí para buscar…"></div>
+    <div class="botones"><button id="btnLimpiarFiltros">Limpiar filtros</button></div>
+
+    <h2>Colorear puntos por</h2>
+    <select id="colorPor">
+      <option value="vendedor" selected>Vendedor (actual de Disma o asignado)</option>
+      <option value="categoria">Categoría</option>
+      <option value="vendedor_asignado">Vendedor asignado</option>
+      <option value="dia_visita">Día de visita</option>
+      <option value="equipo">Equipo</option>
+      <option value="vendedor_disma">Vendedor Disma actual</option>
+      <option value="accion">Acción (queda / entra)</option>
+      <option value="clase_autoservicio">Clase autoservicio (A / B / C)</option>
+    </select>
+    <div class="fila" style="margin-top:6px"><label style="font-weight:600"><input type="checkbox" id="marcarNuevos" checked> Marcar con anillo negro grueso los clientes nuevos (ENTRA)</label></div>
+    <div class="mini">Así ves a la vez la categoría (color de relleno) y si el cliente es nuevo. Los que quedan de Disma tienen borde fino.</div>
+    <div id="leyenda" style="margin-top:6px"></div>
+  </aside>
+
+  <div id="mapa"></div>
+
+  <aside class="der">
+    <div class="kpi"><div class="mini">Clientes visibles con los filtros</div><b id="kVisibles">0</b> <span class="mini" id="kVisiblesMonto"></span></div>
+
+    <h2>Capa de trabajo</h2>
+    <div class="capa-sel"><select id="capaActiva"></select><button id="btnNuevaCapa" title="Crear otra capa">+ Capa</button></div>
+    <div class="fila"><label><input type="checkbox" id="capaFiltra" checked> Al cambiar de capa, mostrar solo su categoría</label></div>
+    <div class="fila"><label><input type="checkbox" id="capaSolo" checked> Ver solo los cuadrantes de esta capa</label></div>
+    <div class="mini">Cada cuadrante que dibujes queda en la capa de trabajo, con su color. Ponele nombre (ej. el vendedor o la zona).</div>
+    <div class="lista-cuad" id="listaCuad"></div>
+
+    <h2>Selección</h2>
+    <div class="mini">Usá el <b>rectángulo</b> o el <b>polígono</b> de la barra del mapa (arriba a la izquierda) para dibujar un cuadrante. Solo se seleccionan los puntos visibles con los filtros actuales.</div>
+    <div class="modo" style="margin-top:6px">Al dibujar:
+      <label><input type="radio" name="modo" value="reemplazar" checked> reemplazar</label>
+      <label><input type="radio" name="modo" value="agregar"> sumar</label>
+      <label><input type="radio" name="modo" value="quitar"> sacar</label>
+    </div>
+    <div class="kpi"><div class="mini">Seleccionados</div><b id="kSel">0</b> <span class="mini" id="kSelDet"></span></div>
+    <div class="botones">
+      <button id="btnSelVisibles">Seleccionar todos los visibles</button>
+      <button id="btnLimpiarSel">Limpiar selección</button>
+      <button id="btnBorrarUltimo">Borrar último cuadrante de la capa</button>
+      <button id="btnBorrarCuadrantes" class="peligro">Borrar todos los cuadrantes de la capa</button>
+    </div>
+
+    <h2>Asignar a los seleccionados</h2>
+    <div class="fila" style="display:block">Equipo
+      <select id="aEquipo">
+        <option value="__auto">Automático por categoría</option>
+        <option>Equipo Mayoristas</option>
+        <option>Equipo Autoservicios</option>
+        <option>Call center</option>
+        <option value="__no">No cambiar</option>
+      </select>
+      <div class="mini">Automático: mayoristas y perfupaña → Equipo Mayoristas · autoservicios → Equipo Autoservicios · resto → Call center.</div>
+    </div>
+    <div class="fila" style="display:block">Vendedor<input type="text" id="aVendedor" list="listaVendedores" placeholder="Ej: 024 Jerez Graciela"><datalist id="listaVendedores"></datalist></div>
+    <div style="margin-top:4px">Día de visita</div>
+    <div class="dias" id="aDias"></div>
+    <div class="botones">
+      <button class="prim" id="btnAsignar" disabled>Asignar</button>
+      <button class="peligro" id="btnQuitarAsig" disabled>Quitar asignación</button>
+      <button id="btnDeshacer" disabled>Deshacer</button>
+    </div>
+
+    <h2>Resumen por vendedor asignado</h2>
+    <div class="mini">Hacé clic en un vendedor para ver solo sus clientes.</div>
+    <div class="tabla-wrap"><table id="tResumen"><thead><tr><th>Vendedor</th><th class="num">Clientes</th><th class="num">Compra/mes</th><th>Días</th></tr></thead><tbody></tbody></table></div>
+
+    <h2>Bajar el archivo</h2>
+    <div class="fila"><label><input type="radio" name="exp" value="todos" checked> Todos los clientes</label></div>
+    <div class="fila"><label><input type="radio" name="exp" value="visibles"> Solo los visibles con los filtros</label></div>
+    <div class="botones">
+      <button class="prim" id="btnXlsx">Bajar Excel (.xlsx)</button>
+      <button id="btnCsv">Bajar CSV</button>
+    </div>
+    <div class="mini" style="margin-top:6px">El archivo trae todas las columnas originales más <b>equipo</b>, <b>vendedor_asignado</b> y <b>dia_visita</b>. Las asignaciones también se guardan solas en este navegador; para seguir otro día, abrí esta página y cargá el último archivo que bajaste.</div>
+    <div class="botones"><button class="peligro" id="btnBorrarGuardado">Borrar asignaciones guardadas en este navegador</button></div>
+  </aside>
+</div>
+
+<div id="carga">
+  <div class="caja" id="cajaCarga">
+    <h1 style="font-size:18px">Mapa de clientes · asignación de vendedores</h1>
+    <p>Arrastrá acá el archivo de la base (<b>CSV</b> o <b>Excel</b>) o elegilo con el botón.</p>
+    <p class="mini">Sirve el CSV que bajaste de BigQuery (<i>base_final_8000</i>) o un archivo que ya bajaste de esta misma página con asignaciones.</p>
+    <input type="file" id="archivo" accept=".csv,.xlsx,.xls,.txt">
+    <div class="botones" style="margin-top:10px"><button class="prim" id="btnCargar" type="button">Cargar archivo</button></div>
+    <p class="mini" id="cargaEstado" style="font-weight:600;color:#b91c1c">⚠ Si ves este texto, el navegador NO está ejecutando la página (por eso no pasa nada). Descargá el archivo .html, buscalo en la carpeta Descargas y abrilo con doble clic en Chrome o Edge. No funciona dentro de la vista previa de Claude ni en el visor del celular.</p>
+  </div>
+</div>
+<div id="aviso"></div>
+
+<script>
+document.getElementById('cargaEstado').textContent = 'Página lista. Elegí el archivo CSV.';
+const PARTIDOS = {"Campana":[[-34.356,-58.942],[-34.381,-58.92],[-34.367,-58.918],[-34.359,-58.909],[-34.353,-58.918],[-34.343,-58.917],[-34.328,-58.917],[-34.326,-58.912],[-34.321,-58.915],[-34.318,-58.909],[-34.312,-58.905],[-34.311,-58.901],[-34.309,-58.904],[-34.305,-58.889],[-34.302,-58.889],[-34.301,-58.885],[-34.298,-58.882],[-34.293,-58.881],[-34.286,-58.88],[-34.276,-58.875],[-34.274,-58.87],[-34.276,-58.863],[-34.264,-58.862],[-34.266,-58.849],[-34.279,-58.812],[-34.28,-58.793],[-34.286,-58.778],[-34.273,-58.778],[-34.237,-58.803],[-34.229,-58.794],[-34.248,-58.715],[-34.217,-58.708],[-34.195,-58.694],[-34.173,-58.692],[-34.164,-58.747],[-34.154,-58.748],[-34.149,-58.762],[-34.13,-58.767],[-34.124,-58.768],[-34.085,-58.805],[-34.077,-58.791],[-34.027,-58.674],[-33.947,-58.758],[-33.944,-58.779],[-33.954,-58.828],[-33.948,-58.846],[-33.958,-58.869],[-33.961,-58.944],[-33.962,-58.967],[-34.095,-59.006],[-34.103,-59.004],[-34.114,-58.977],[-34.129,-58.972],[-34.198,-59.103],[-34.213,-59.106],[-34.227,-59.088],[-34.225,-59.08],[-34.244,-59.06],[-34.248,-59.062],[-34.292,-59.015],[-34.322,-58.982],[-34.323,-58.976],[-34.359,-58.945],[-34.356,-58.942]],"CABA":[[-34.658,-58.525],[-34.705,-58.462],[-34.661,-58.42],[-34.661,-58.389],[-34.647,-58.36],[-34.632,-58.347],[-34.628,-58.345],[-34.628,-58.34],[-34.625,-58.337],[-34.617,-58.34],[-34.595,-58.356],[-34.594,-58.364],[-34.591,-58.367],[-34.587,-58.363],[-34.584,-58.36],[-34.584,-58.366],[-34.581,-58.371],[-34.58,-58.365],[-34.577,-58.371],[-34.572,-58.376],[-34.574,-58.382],[-34.57,-58.379],[-34.568,-58.383],[-34.573,-58.392],[-34.567,-58.396],[-34.553,-58.423],[-34.536,-58.445],[-34.536,-58.45],[-34.527,-58.458],[-34.555,-58.503],[-34.622,-58.531],[-34.658,-58.525]],"Escobar":[[-34.4,-58.789],[-34.412,-58.772],[-34.456,-58.737],[-34.441,-58.708],[-34.401,-58.731],[-34.389,-58.716],[-34.371,-58.708],[-34.364,-58.721],[-34.347,-58.69],[-34.35,-58.685],[-34.265,-58.649],[-34.229,-58.794],[-34.239,-58.801],[-34.279,-58.775],[-34.286,-58.778],[-34.279,-58.801],[-34.279,-58.812],[-34.274,-58.826],[-34.262,-58.855],[-34.268,-58.864],[-34.276,-58.863],[-34.276,-58.875],[-34.286,-58.88],[-34.293,-58.881],[-34.298,-58.882],[-34.301,-58.885],[-34.302,-58.889],[-34.305,-58.889],[-34.31,-58.901],[-34.387,-58.839],[-34.415,-58.816],[-34.406,-58.793],[-34.4,-58.789]],"Esteban Echeverría":[[-34.818,-58.432],[-34.761,-58.473],[-34.722,-58.505],[-34.741,-58.516],[-34.751,-58.523],[-34.783,-58.523],[-34.825,-58.509],[-34.881,-58.504],[-34.903,-58.508],[-34.926,-58.494],[-34.883,-58.42],[-34.875,-58.414],[-34.828,-58.446],[-34.818,-58.432]],"Exaltación de la Cruz":[[-34.2,-59.103],[-34.18,-59.239],[-34.172,-59.237],[-34.164,-59.324],[-34.197,-59.363],[-34.227,-59.378],[-34.235,-59.375],[-34.264,-59.298],[-34.29,-59.31],[-34.308,-59.277],[-34.307,-59.272],[-34.372,-59.194],[-34.375,-59.197],[-34.423,-59.133],[-34.424,-59.128],[-34.462,-59.099],[-34.453,-59.08],[-34.439,-59.077],[-34.436,-59.072],[-34.417,-59.04],[-34.402,-59.025],[-34.397,-59.028],[-34.376,-58.992],[-34.369,-58.984],[-34.358,-58.993],[-34.352,-58.984],[-34.417,-58.924],[-34.41,-58.919],[-34.386,-58.92],[-34.383,-58.919],[-34.356,-58.942],[-34.359,-58.945],[-34.32,-58.978],[-34.319,-58.987],[-34.248,-59.062],[-34.244,-59.06],[-34.225,-59.08],[-34.228,-59.092],[-34.213,-59.106],[-34.2,-59.103]],"Ezeiza":[[-34.899,-58.509],[-34.855,-58.503],[-34.788,-58.519],[-34.766,-58.524],[-34.741,-58.521],[-34.747,-58.539],[-34.757,-58.539],[-34.759,-58.546],[-34.751,-58.552],[-34.757,-58.564],[-34.773,-58.575],[-34.778,-58.579],[-34.78,-58.586],[-34.795,-58.59],[-34.811,-58.601],[-34.817,-58.614],[-34.881,-58.645],[-34.891,-58.65],[-34.919,-58.626],[-34.924,-58.612],[-34.942,-58.6],[-34.959,-58.618],[-35.007,-58.556],[-34.982,-58.55],[-34.975,-58.554],[-34.959,-58.533],[-34.962,-58.53],[-34.926,-58.494],[-34.899,-58.509]],"General Las Heras":[[-34.719,-59.09],[-34.804,-59.166],[-34.853,-59.219],[-34.927,-59.116],[-35.021,-58.993],[-35.041,-59.015],[-35.102,-58.936],[-34.965,-58.777],[-34.904,-58.86],[-34.892,-58.846],[-34.818,-58.936],[-34.831,-58.951],[-34.765,-59.032],[-34.719,-59.09]],"General Rodríguez":[[-34.569,-58.993],[-34.577,-58.987],[-34.591,-59.022],[-34.589,-59.04],[-34.604,-59.071],[-34.616,-59.056],[-34.65,-59.119],[-34.661,-59.135],[-34.719,-59.09],[-34.762,-59.03],[-34.76,-59.012],[-34.762,-58.998],[-34.726,-58.957],[-34.712,-58.946],[-34.699,-58.922],[-34.695,-58.886],[-34.685,-58.868],[-34.666,-58.884],[-34.625,-58.881],[-34.617,-58.864],[-34.579,-58.889],[-34.577,-58.885],[-34.516,-58.928],[-34.534,-58.962],[-34.544,-58.954],[-34.56,-58.987],[-34.566,-58.988],[-34.569,-58.993]],"General San Martín":[[-34.597,-58.522],[-34.569,-58.51],[-34.539,-58.533],[-34.542,-58.54],[-34.53,-58.554],[-34.489,-58.6],[-34.535,-58.607],[-34.547,-58.617],[-34.592,-58.557],[-34.597,-58.522]],"Hurlingham":[[-34.563,-58.646],[-34.583,-58.68],[-34.595,-58.693],[-34.631,-58.649],[-34.63,-58.62],[-34.585,-58.62],[-34.563,-58.646]],"Ituzaingó":[[-34.685,-58.668],[-34.628,-58.656],[-34.596,-58.696],[-34.607,-58.716],[-34.635,-58.729],[-34.685,-58.668]],"José C. Paz":[[-34.549,-58.763],[-34.547,-58.752],[-34.519,-58.722],[-34.505,-58.737],[-34.482,-58.777],[-34.456,-58.815],[-34.457,-58.82],[-34.48,-58.812],[-34.511,-58.821],[-34.555,-58.778],[-34.549,-58.763]],"La Matanza":[[-34.705,-58.462],[-34.635,-58.558],[-34.646,-58.581],[-34.704,-58.641],[-34.717,-58.638],[-34.725,-58.652],[-34.726,-58.66],[-34.74,-58.675],[-34.753,-58.658],[-34.766,-58.675],[-34.761,-58.681],[-34.779,-58.704],[-34.759,-58.729],[-34.777,-58.75],[-34.812,-58.708],[-34.818,-58.727],[-34.819,-58.735],[-34.827,-58.758],[-34.828,-58.774],[-34.847,-58.751],[-34.859,-58.761],[-34.912,-58.692],[-34.889,-58.647],[-34.858,-58.636],[-34.812,-58.607],[-34.805,-58.594],[-34.778,-58.583],[-34.776,-58.575],[-34.767,-58.572],[-34.757,-58.564],[-34.751,-58.552],[-34.759,-58.546],[-34.755,-58.536],[-34.745,-58.536],[-34.736,-58.511],[-34.722,-58.505],[-34.732,-58.486],[-34.705,-58.462]],"Lomas de Zamora":[[-34.724,-58.497],[-34.817,-58.43],[-34.803,-58.406],[-34.8,-58.409],[-34.771,-58.359],[-34.766,-58.359],[-34.755,-58.337],[-34.74,-58.35],[-34.743,-58.37],[-34.731,-58.415],[-34.69,-58.446],[-34.732,-58.486],[-34.724,-58.497]],"Luján":[[-34.591,-59.022],[-34.577,-58.987],[-34.569,-58.993],[-34.564,-58.984],[-34.56,-58.987],[-34.544,-58.954],[-34.483,-59.001],[-34.488,-59.01],[-34.43,-59.055],[-34.436,-59.072],[-34.444,-59.08],[-34.456,-59.081],[-34.462,-59.099],[-34.421,-59.13],[-34.423,-59.133],[-34.376,-59.198],[-34.397,-59.216],[-34.415,-59.239],[-34.446,-59.217],[-34.508,-59.338],[-34.619,-59.264],[-34.625,-59.281],[-34.678,-59.242],[-34.685,-59.256],[-34.804,-59.166],[-34.719,-59.091],[-34.658,-59.134],[-34.616,-59.056],[-34.604,-59.071],[-34.587,-59.036],[-34.591,-59.022]],"Malvinas Argentinas":[[-34.477,-58.783],[-34.5,-58.749],[-34.505,-58.737],[-34.532,-58.703],[-34.528,-58.691],[-34.521,-58.675],[-34.502,-58.646],[-34.452,-58.696],[-34.441,-58.708],[-34.467,-58.751],[-34.464,-58.76],[-34.468,-58.771],[-34.477,-58.783]],"Marcos Paz":[[-34.904,-58.86],[-34.954,-58.788],[-34.957,-58.762],[-34.938,-58.743],[-34.919,-58.715],[-34.912,-58.696],[-34.859,-58.761],[-34.847,-58.751],[-34.828,-58.774],[-34.822,-58.738],[-34.817,-58.732],[-34.814,-58.712],[-34.812,-58.708],[-34.739,-58.806],[-34.698,-58.865],[-34.685,-58.861],[-34.685,-58.868],[-34.699,-58.904],[-34.703,-58.935],[-34.723,-58.956],[-34.75,-58.982],[-34.763,-59.006],[-34.76,-59.027],[-34.762,-59.03],[-34.765,-59.032],[-34.831,-58.951],[-34.818,-58.936],[-34.892,-58.846],[-34.904,-58.86]],"Merlo":[[-34.779,-58.704],[-34.761,-58.681],[-34.766,-58.675],[-34.753,-58.658],[-34.74,-58.675],[-34.722,-58.655],[-34.725,-58.652],[-34.717,-58.638],[-34.702,-58.645],[-34.635,-58.729],[-34.649,-58.742],[-34.665,-58.771],[-34.677,-58.81],[-34.685,-58.82],[-34.685,-58.861],[-34.698,-58.865],[-34.775,-58.753],[-34.759,-58.729],[-34.779,-58.704]],"Moreno":[[-34.607,-58.716],[-34.534,-58.799],[-34.509,-58.825],[-34.558,-58.856],[-34.579,-58.889],[-34.583,-58.888],[-34.617,-58.864],[-34.627,-58.884],[-34.669,-58.884],[-34.685,-58.861],[-34.683,-58.815],[-34.665,-58.775],[-34.652,-58.746],[-34.638,-58.732],[-34.607,-58.716]],"Morón":[[-34.633,-58.558],[-34.627,-58.566],[-34.626,-58.574],[-34.607,-58.591],[-34.588,-58.616],[-34.614,-58.62],[-34.632,-58.622],[-34.63,-58.654],[-34.688,-58.665],[-34.704,-58.641],[-34.646,-58.581],[-34.633,-58.558]],"Pilar":[[-34.476,-58.784],[-34.466,-58.768],[-34.465,-58.754],[-34.464,-58.744],[-34.456,-58.737],[-34.403,-58.781],[-34.4,-58.789],[-34.413,-58.808],[-34.415,-58.816],[-34.311,-58.901],[-34.313,-58.908],[-34.318,-58.909],[-34.321,-58.915],[-34.326,-58.912],[-34.328,-58.917],[-34.35,-58.915],[-34.358,-58.913],[-34.363,-58.909],[-34.368,-58.917],[-34.376,-58.919],[-34.401,-58.922],[-34.415,-58.921],[-34.417,-58.924],[-34.352,-58.984],[-34.358,-58.993],[-34.369,-58.984],[-34.391,-59.015],[-34.397,-59.028],[-34.402,-59.025],[-34.425,-59.05],[-34.43,-59.055],[-34.488,-59.01],[-34.483,-59.001],[-34.534,-58.962],[-34.516,-58.928],[-34.577,-58.885],[-34.545,-58.845],[-34.48,-58.812],[-34.457,-58.82],[-34.458,-58.812],[-34.476,-58.784]],"San Fernando":[[-34.321,-58.49],[-34.324,-58.438],[-34.379,-58.395],[-34.366,-58.364],[-34.295,-58.258],[-34.287,-58.223],[-34.274,-58.212],[-34.231,-58.196],[-34.2,-58.252],[-34.15,-58.317],[-34.073,-58.339],[-34.038,-58.345],[-33.985,-58.387],[-34.003,-58.416],[-34.004,-58.484],[-34.027,-58.553],[-34.027,-58.578],[-34.037,-58.608],[-34.036,-58.649],[-34.028,-58.681],[-34.082,-58.805],[-34.097,-58.795],[-34.128,-58.764],[-34.14,-58.766],[-34.153,-58.754],[-34.158,-58.747],[-34.166,-58.745],[-34.173,-58.692],[-34.213,-58.701],[-34.222,-58.711],[-34.248,-58.712],[-34.285,-58.577],[-34.3,-58.541],[-34.304,-58.512],[-34.321,-58.49]],"San Fernando (continente)":[[-34.4772,-58.6055],[-34.4882,-58.5995],[-34.4822,-58.5861],[-34.476,-58.5777],[-34.4492,-58.5213],[-34.446,-58.5176],[-34.4383,-58.5355],[-34.4313,-58.5426],[-34.4285,-58.5513],[-34.4242,-58.5584],[-34.4312,-58.5618],[-34.4452,-58.5814],[-34.4483,-58.5954],[-34.4517,-58.5953],[-34.4772,-58.6055]],"San Isidro":[[-34.444,-58.511],[-34.489,-58.6],[-34.529,-58.552],[-34.499,-58.501],[-34.487,-58.48],[-34.472,-58.488],[-34.465,-58.494],[-34.451,-58.505],[-34.444,-58.511]],"San Miguel":[[-34.606,-58.714],[-34.547,-58.623],[-34.538,-58.609],[-34.535,-58.607],[-34.503,-58.649],[-34.529,-58.687],[-34.528,-58.696],[-34.532,-58.703],[-34.519,-58.72],[-34.55,-58.758],[-34.549,-58.763],[-34.558,-58.777],[-34.582,-58.745],[-34.606,-58.714]],"Tigre":[[-34.43,-58.56],[-34.424,-58.558],[-34.445,-58.521],[-34.384,-58.391],[-34.324,-58.438],[-34.321,-58.49],[-34.299,-58.52],[-34.299,-58.547],[-34.27,-58.624],[-34.265,-58.649],[-34.35,-58.685],[-34.349,-58.695],[-34.364,-58.721],[-34.375,-58.706],[-34.389,-58.716],[-34.405,-58.732],[-34.488,-58.663],[-34.535,-58.607],[-34.486,-58.599],[-34.473,-58.604],[-34.448,-58.592],[-34.43,-58.56]],"Tres de Febrero":[[-34.598,-58.523],[-34.594,-58.545],[-34.588,-58.566],[-34.547,-58.623],[-34.562,-58.644],[-34.619,-58.58],[-34.627,-58.57],[-34.653,-58.531],[-34.607,-58.527],[-34.598,-58.523]],"Vicente López":[[-34.547,-58.496],[-34.529,-58.461],[-34.517,-58.469],[-34.491,-58.481],[-34.526,-58.548],[-34.532,-58.551],[-34.542,-58.54],[-34.539,-58.529],[-34.569,-58.51],[-34.547,-58.496]],"Zárate":[[-34.18,-59.239],[-34.198,-59.103],[-34.129,-58.972],[-34.114,-58.977],[-34.099,-59.009],[-34.065,-58.995],[-33.962,-58.967],[-33.958,-58.879],[-33.955,-58.858],[-33.948,-58.846],[-33.939,-58.862],[-33.889,-58.901],[-33.873,-58.938],[-33.873,-58.973],[-33.854,-58.988],[-33.841,-58.994],[-33.847,-59.028],[-33.835,-59.043],[-33.837,-59.076],[-33.849,-59.119],[-33.848,-59.133],[-33.836,-59.151],[-33.806,-59.176],[-33.815,-59.238],[-33.822,-59.281],[-33.831,-59.295],[-33.843,-59.296],[-33.854,-59.303],[-33.864,-59.29],[-33.88,-59.264],[-33.893,-59.245],[-33.924,-59.229],[-33.936,-59.259],[-33.94,-59.259],[-33.931,-59.286],[-33.93,-59.3],[-33.924,-59.313],[-33.931,-59.327],[-33.927,-59.335],[-33.928,-59.342],[-33.942,-59.345],[-33.958,-59.34],[-33.985,-59.332],[-34.011,-59.314],[-34.052,-59.302],[-34.064,-59.303],[-34.086,-59.268],[-34.103,-59.271],[-34.14,-59.277],[-34.158,-59.3],[-34.161,-59.313],[-34.172,-59.237],[-34.18,-59.239]]};
+
+const CAT_COLOR = { AUTOSERVICIOS:'#2563eb', MAYORISTAS:'#dc2626', PERFUPANA:'#a21caf', RESTO:'#16a34a' };
+const CAT_NOMBRE = { AUTOSERVICIOS:'Autoservicios', MAYORISTAS:'Mayoristas', PERFUPANA:'Perfupaña', RESTO:'Resto' };
+const EQUIPO_AUTO = { MAYORISTAS:'Equipo Mayoristas', AUTOSERVICIOS:'Equipo Autoservicios', PERFUPANA:'Equipo Mayoristas', RESTO:'Call center' };
+const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const PALETA = ['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#9a6324','#469990','#800000','#808000','#000075','#bfef45','#fabed4','#dcbeff','#ffd8b1','#aaffc3','#a9a9a9','#ffe119','#008080'];
+const CLAVE_LS = 'disma_mapa_asignaciones_v1';
+
+let filas = [];          // registros
+let columnas = [];       // columnas originales
+let marcadores = [];     // circleMarker por fila
+let seleccion = new Set();
+let historial = [];
+let nombreArchivo = '';
+let mapa, capaPuntos, capaCuadrantes, capaEtiquetas, renderer, ctrlDraw;
+let CAPAS = [
+  { id: 'AUTOSERVICIOS', nombre: 'Autoservicios', color: '#2563eb', cats: ['AUTOSERVICIOS'] },
+  { id: 'MAYORISTAS', nombre: 'Mayoristas y perfupaña', color: '#dc2626', cats: ['MAYORISTAS', 'PERFUPANA'] },
+  { id: 'RESTO', nombre: 'Resto / call center', color: '#16a34a', cats: ['RESTO'] }
+];
+const COLORES_EXTRA = ['#ea580c', '#9333ea', '#0891b2', '#ca8a04', '#db2777', '#4b5563'];
+let cuadrantes = [];   // { id, capa, nombre, layer, etiqueta }
+let capaActiva = 'AUTOSERVICIOS';
+let sigCuad = 1;
+const fmt = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const fmtM = n => '$ ' + (n / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M';
+
+function estado(txt) { const e = document.getElementById('cargaEstado'); if (e) e.textContent = txt; }
+window.addEventListener('error', ev => { estado('Error: ' + (ev.message || ev.error) + ' (avisale a Claude este texto)'); });
+
+function aviso(txt, ms = 3500) {
+  const a = document.getElementById('aviso'); a.textContent = txt; a.style.display = 'block';
+  clearTimeout(aviso._t); aviso._t = setTimeout(() => a.style.display = 'none', ms);
+}
+
+/* ---------- lectura de archivos ---------- */
+function parseCSV(texto) {
+  if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
+  const primera = texto.slice(0, texto.indexOf('\n'));
+  const sep = (primera.split(';').length > primera.split(',').length) ? ';' : ',';
+  const out = []; let fila = [], campo = '', comillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i];
+    if (comillas) {
+      if (ch === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else comillas = false; }
+      else campo += ch;
+    } else if (ch === '"') comillas = true;
+    else if (ch === sep) { fila.push(campo); campo = ''; }
+    else if (ch === '\n') { fila.push(campo); out.push(fila); fila = []; campo = ''; }
+    else if (ch !== '\r') campo += ch;
+  }
+  if (campo !== '' || fila.length) { fila.push(campo); out.push(fila); }
+  const cab = out.shift().map(c => c.trim());
+  return { cab, filas: out.filter(f => f.length > 1).map(f => Object.fromEntries(cab.map((c, j) => [c, f[j] ?? '']))) };
+}
+
+function leerArchivo(file) {
+  if (!file) { estado('Primero elegí el archivo con el botón de arriba.'); return; }
+  if (typeof L === 'undefined' || !mapa) { estado('El mapa no se cargó: revisá que tengas internet y que abriste el archivo .html descargado en Chrome (no en la vista previa). Después recargá la página (F5).'); return; }
+  nombreArchivo = file.name;
+  document.getElementById('cargaEstado').textContent = 'Leyendo ' + file.name + '…';
+  const r = new FileReader();
+  if (/\.xlsx?$/i.test(file.name)) {
+    if (typeof XLSX === 'undefined') { document.getElementById('cargaEstado').textContent = 'No se pudo cargar el lector de Excel (¿sin internet?). Usá el CSV.'; return; }
+    r.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const hoja = wb.Sheets[wb.SheetNames.includes('Clientes') ? 'Clientes' : wb.SheetNames[0]];
+        const datos = XLSX.utils.sheet_to_json(hoja, { defval: '', raw: true });
+        iniciar(Object.keys(datos[0] || {}), datos);
+        if (wb.Sheets['Cuadrantes']) {
+          const aoa = XLSX.utils.sheet_to_json(wb.Sheets['Cuadrantes'], { header: 1, defval: '' });
+          const cfgFila = aoa.find(r => r[0] === '_config'); const cfg = cfgFila ? JSON.parse(cfgFila[1]) : {};
+          const capasNom = Object.fromEntries((cfg.capas || CAPAS).map(c => [c.nombre, c.id]));
+          const qs = aoa.slice(1).filter(r => r[0] && r[0] !== '_config' && r[4]).map((r, i) => ({ id: 'q' + (i + 1), capa: capasNom[r[0]] || CAPAS[0].id, nombre: String(r[1]), pts: JSON.parse(r[4]) }));
+          const n = restaurarCuadrantes({ capas: cfg.capas, activa: cfg.activa, cuadrantes: qs }); guardarCuadrantes();
+          if (n) aviso(`Se recuperaron ${n} cuadrantes del archivo`, 6000);
+        }
+      } catch (err) { estado('No se pudo leer el Excel: ' + err.message); console.error(err); }
+    };
+    r.readAsArrayBuffer(file);
+  } else {
+    r.onload = e => {
+      try { const p = parseCSV(e.target.result); iniciar(p.cab, p.filas); }
+      catch (err) { estado('No se pudo leer el archivo: ' + err.message); console.error(err); }
+    };
+    r.onerror = () => estado('El navegador no pudo leer el archivo. Probá copiarlo al Escritorio y elegirlo de nuevo.');
+    r.readAsText(file, 'utf-8');
+  }
+}
+
+/* ---------- datos ---------- */
+const num = v => {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return v;
+  let s = String(v).replace(/[$\s\u00a0]/g, '');
+  const uc = s.lastIndexOf(','), up = s.lastIndexOf('.');
+  if (uc >= 0 && up >= 0) s = uc > up ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (uc >= 0) s = (s.split(',').length > 2) ? s.replace(/,/g, '') : s.replace(',', '.');
+  else if (s.split('.').length > 2 || /^-?\d{1,3}\.\d{3}$/.test(s)) s = s.replace(/\./g, '');
+  const n = Number(s); return isNaN(n) ? 0 : n;
+};
+// coordenadas: si se perdió la coma decimal (ej. -345123456) la reubica
+const coord = v => { let n = num(v); let k = 0; while (Math.abs(n) >= 100 && k++ < 15) n /= 10; return n; };
+const clave = f => (f.sistema || '') + '|' + (f.id_interno || f.codigo_cliente || f._i);
+
+function iniciar(cab, datos) {
+  const norm = c => String(c).trim().toLowerCase();
+  if (cab.some(c => c !== norm(c))) { datos = datos.map(f => Object.fromEntries(Object.entries(f).map(([k, v]) => [norm(k), v]))); cab = cab.map(norm); }
+  if (!datos.length || !('latitud' in datos[0]) || !('categoria' in datos[0])) {
+    document.getElementById('cargaEstado').textContent = 'El archivo no tiene las columnas esperadas (latitud, longitud, categoria…). Columnas encontradas: ' + cab.slice(0, 8).join(', ') + '… Usá el CSV de base_final_8000.';
+    return;
+  }
+  columnas = cab.filter(c => !['equipo', 'vendedor_asignado', 'dia_visita', 'cuadrante', 'ubicacion_corregida'].includes(c));
+  let ubic = {}; try { ubic = JSON.parse(localStorage.getItem(CLAVE_LS + '_ubic') || '{}'); } catch (e) {}
+  let guardado = {};
+  try { guardado = JSON.parse(localStorage.getItem(CLAVE_LS) || '{}'); } catch (e) {}
+  let recuperados = 0;
+  filas = datos.map((f, i) => {
+    f._i = i;
+    f._lat = coord(f.latitud); f._lng = coord(f.longitud);
+    f._total = num(f.total_comprado);
+    f._cat = (f.categoria || 'RESTO').toUpperCase();
+    f._k = clave(f);
+    const g = guardado[f._k];
+    if (!f.vendedor_asignado && !f.dia_visita && g) { f.equipo = g.e || ''; f.vendedor_asignado = g.v || ''; f.dia_visita = g.d || ''; recuperados++; }
+    f.equipo = f.equipo || ''; f.vendedor_asignado = f.vendedor_asignado || ''; f.dia_visita = f.dia_visita || '';
+    f.ubicacion_corregida = f.ubicacion_corregida || '';
+    if (!f.ubicacion_corregida && ubic[f._k]) { [f._lat, f._lng] = ubic[f._k]; f.latitud = f._lat; f.longitud = f._lng; f.ubicacion_corregida = 'SI'; }
+    f._ok = f._lat < -33 && f._lat > -36 && f._lng < -57.5 && f._lng > -60.5;
+    f._rev = calcularRevisar(f);
+    return f;
+  });
+  document.getElementById('carga').style.display = 'none';
+  const sinUb = filas.filter(f => !f._ok).length;
+  document.getElementById('archivoInfo').textContent = `${nombreArchivo}: ${filas.length.toLocaleString('es-AR')} clientes` + (sinUb ? ` · ${sinUb} sin ubicación válida (no se ven en el mapa)` : '');
+  document.getElementById('nRevisar').textContent = filas.filter(f => f._rev).length;
+  armarFiltros(); crearMarcadores(); aplicarFiltros(true); guardar(); resumen(); actualizarSeleccion();
+  if (!cuadrantes.length) { try { restaurarCuadrantes(JSON.parse(localStorage.getItem(CLAVE_LS + '_cuad') || 'null')); } catch (e) {} }
+  cambiarCapa(capaActiva);
+  if (recuperados) aviso(`Se recuperaron ${recuperados} asignaciones guardadas en este navegador.`, 6000);
+}
+
+/* ---------- ubicaciones dudosas ---------- */
+const AJENOS = ['CABA', 'La Matanza', 'Lomas de Zamora', 'Esteban Echeverría', 'Ezeiza', 'Luján', 'Exaltación de la Cruz', 'General Las Heras'];
+function calcularRevisar(f) {
+  if (f.ubicacion_corregida) return false;
+  if (!f._ok) return true;
+  if (/revisar coordenadas|fuera de zona/i.test(f.alertas || '')) return true;
+  return false;
+}
+function guardarUbic() {
+  const g = {}; filas.forEach(f => { if (f.ubicacion_corregida === 'SI') g[f._k] = [f._lat, f._lng]; });
+  try { localStorage.setItem(CLAVE_LS + '_ubic', JSON.stringify(g)); } catch (e) {}
+}
+function corregirUbicacion(f) {
+  mapa.closePopup();
+  aviso('Hacé clic en el mapa donde está el local de ' + (f.nombre || '') + ' (Esc para cancelar)', 15000);
+  const cont = mapa.getContainer(); cont.style.cursor = 'crosshair';
+  const fin = () => { cont.style.cursor = ''; mapa.off('click', clic); document.removeEventListener('keydown', esc); };
+  const esc = ev => { if (ev.key === 'Escape') { fin(); aviso('Corrección cancelada'); } };
+  const clic = ev => {
+    fin();
+    f._lat = +ev.latlng.lat.toFixed(6); f._lng = +ev.latlng.lng.toFixed(6);
+    f.latitud = f._lat; f.longitud = f._lng; f.ubicacion_corregida = 'SI'; f._ok = true; f._rev = false;
+    marcadores[f._i].setLatLng([f._lat, f._lng]);
+    guardarUbic(); document.getElementById('nRevisar').textContent = filas.filter(x => x._rev).length;
+    aplicarFiltros(); pintar(); aviso('Ubicación corregida: ' + (f.nombre || ''));
+  };
+  setTimeout(() => { mapa.on('click', clic); document.addEventListener('keydown', esc); }, 50);
+}
+
+/* ---------- capas de cuadrantes ---------- */
+function salirEdicion() {
+  try { const tb = ctrlDraw && ctrlDraw._toolbars && ctrlDraw._toolbars.edit; if (tb && tb._activeMode) { tb._activeMode.handler.revertLayers && tb._activeMode.handler.revertLayers(); tb.disable(); } } catch (e) { console.error(e); }
+}
+const capaDe = id => CAPAS.find(c => c.id === id) || CAPAS[0];
+const anilloDe = layer => layer.getLatLngs()[0].map(p => [p.lat, p.lng]);
+const centroDe = layer => layer.getBounds().getCenter();
+function estiloCuad(c) { const col = capaDe(c.capa).color; return { color: col, weight: c.capa === capaActiva ? 3 : 2, fillColor: col, fillOpacity: c.capa === capaActiva ? 0.08 : 0.03, dashArray: c.capa === capaActiva ? null : '4 4', interactive: false }; }
+function agregarCuadrante(capaId, nombre, layer, id) {
+  const cap = capaDe(capaId);
+  const n = cuadrantes.filter(c => c.capa === capaId).length + 1;
+  const c = { id: id || ('q' + (sigCuad++)), capa: capaId, nombre: nombre || `${cap.nombre} ${n}`, layer };
+  c.etiqueta = L.tooltip({ permanent: true, direction: 'center', className: 'etq-cuad' }).setContent(c.nombre).setLatLng(centroDe(layer));
+  cuadrantes.push(c); layer.setStyle(estiloCuad(c));
+  mostrarCuadrantes();
+  return c;
+}
+function moverEtiqueta(c) { c.etiqueta.setLatLng(centroDe(c.layer)); }
+function cuadVisibles() { const solo = document.getElementById('capaSolo').checked; return cuadrantes.filter(c => !solo || c.capa === capaActiva); }
+function mostrarCuadrantes() {
+  if (!capaCuadrantes) return;
+  capaCuadrantes.clearLayers(); capaEtiquetas.clearLayers();
+  cuadVisibles().forEach(c => { c.layer.setStyle(estiloCuad(c)); capaCuadrantes.addLayer(c.layer); c.etiqueta.setContent(c.nombre).setLatLng(centroDe(c.layer)); capaEtiquetas.addLayer(c.etiqueta); });
+}
+function clientesEn(c, soloVisibles) { const an = anilloDe(c.layer); return filas.filter(f => f._ok && (!soloVisibles || f._vis) && puntoEnPoligono(f._lat, f._lng, an)); }
+function listaCuadrantes() {
+  const cont = document.getElementById('listaCuad'); if (!cont) return;
+  const mias = cuadrantes.filter(c => c.capa === capaActiva);
+  const cap = capaDe(capaActiva);
+  if (!mias.length) { cont.innerHTML = '<div class="mini" style="padding:6px">Todavía no hay cuadrantes en esta capa. Dibujá uno con el rectángulo o el polígono.</div>'; return; }
+  cont.innerHTML = '';
+  mias.forEach(c => {
+    const n = clientesEn(c, false).filter(f => !cap.cats || cap.cats.includes(f._cat)).length;
+    const it = document.createElement('div'); it.className = 'it';
+    it.innerHTML = `<span class="sw" style="background:${cap.color}"></span><input value="${c.nombre.replace(/"/g, '&quot;')}" title="Nombre del cuadrante"><span class="n" title="Clientes de la categoría de la capa">${n} cl.</span><button title="Seleccionar los clientes visibles de este cuadrante">Selec.</button><button title="Ir al cuadrante">Ver</button><button class="peligro" title="Borrar este cuadrante">✕</button>`;
+    const [inp] = it.getElementsByTagName('input'); const [bS, bV, bX] = it.getElementsByTagName('button');
+    inp.onchange = () => { c.nombre = inp.value.trim() || c.nombre; c.etiqueta.setContent(c.nombre); guardarCuadrantes(); };
+    bS.onclick = () => { const modo = document.querySelector('input[name=modo]:checked').value; const ids = clientesEn(c, true).map(f => f._i);
+      if (modo === 'reemplazar') seleccion = new Set(ids); else if (modo === 'agregar') ids.forEach(i => seleccion.add(i)); else ids.forEach(i => seleccion.delete(i));
+      pintar(); actualizarSeleccion(); aviso(`${ids.length} clientes visibles en ${c.nombre}`); };
+    bV.onclick = () => mapa.fitBounds(c.layer.getBounds(), { padding: [30, 30] });
+    bX.onclick = () => { salirEdicion(); cuadrantes = cuadrantes.filter(x => x !== c); mostrarCuadrantes(); guardarCuadrantes(); listaCuadrantes(); aviso('Se borró ' + c.nombre); };
+    cont.appendChild(it);
+  });
+}
+function opcionesCapas() {
+  document.getElementById('capaActiva').innerHTML = CAPAS.map(c => `<option value="${c.id}" ${c.id === capaActiva ? 'selected' : ''}>${c.nombre}</option>`).join('');
+  document.getElementById('capaActiva').style.borderLeft = '6px solid ' + capaDe(capaActiva).color;
+}
+function cambiarCapa(id) {
+  capaActiva = id; opcionesCapas();
+  const cap = capaDe(id);
+  if (document.getElementById('capaFiltra').checked && cap.cats && filas.length) {
+    document.querySelectorAll('#fCategorias input').forEach(i => i.checked = cap.cats.includes(i.value));
+    aplicarFiltros();
+  }
+  mostrarCuadrantes(); listaCuadrantes(); guardarCuadrantes();
+}
+function nuevaCapa() {
+  const nom = prompt('Nombre de la nueva capa (ej. "Autoservicios zona norte"):'); if (!nom || !nom.trim()) return;
+  const base = prompt('¿Qué categoría trabaja esta capa? Escribí: autoservicios, mayoristas, resto o todas', 'todas') || 'todas';
+  const b = base.trim().toUpperCase();
+  const cats = b.startsWith('AUTO') ? ['AUTOSERVICIOS'] : b.startsWith('MAY') ? ['MAYORISTAS'] : b.startsWith('RES') ? ['RESTO', 'PERFUPANA'] : null;
+  const id = 'C' + Date.now();
+  CAPAS.push({ id, nombre: nom.trim(), color: COLORES_EXTRA[(CAPAS.length - 3) % COLORES_EXTRA.length], cats });
+  cambiarCapa(id);
+}
+function serializarCuadrantes() {
+  return { capas: CAPAS, activa: capaActiva, cuadrantes: cuadrantes.map(c => ({ id: c.id, capa: c.capa, nombre: c.nombre, pts: anilloDe(c.layer).map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]) })) };
+}
+function guardarCuadrantes() { try { localStorage.setItem(CLAVE_LS + '_cuad', JSON.stringify(serializarCuadrantes())); } catch (e) {} }
+function restaurarCuadrantes(datos) {
+  if (!datos || !datos.cuadrantes) return 0;
+  if (datos.capas && datos.capas.length) CAPAS = datos.capas;
+  CAPAS.forEach(c => {  // perfupaña va con mayoristas
+    if (c.id === 'MAYORISTAS') { c.cats = ['MAYORISTAS', 'PERFUPANA']; c.nombre = 'Mayoristas y perfupaña'; }
+    if (c.id === 'RESTO') c.cats = ['RESTO'];
+  });
+  cuadrantes = [];
+  datos.cuadrantes.forEach(q => { if (q.pts && q.pts.length > 2) agregarCuadrante(q.capa, q.nombre, L.polygon(q.pts, { interactive: false }), q.id); });
+  sigCuad = cuadrantes.length + 1;
+  capaActiva = CAPAS.some(c => c.id === datos.activa) ? datos.activa : CAPAS[0].id;
+  opcionesCapas(); mostrarCuadrantes(); listaCuadrantes();
+  return cuadrantes.length;
+}
+// cuadrante del cliente: el de la capa que trabaja su categoría (o una capa "todas")
+function cuadranteDeCliente(f) {
+  if (!f._ok) return '';
+  const r = cuadrantes.filter(c => { const cap = capaDe(c.capa); return (!cap.cats || cap.cats.includes(f._cat)) && puntoEnPoligono(f._lat, f._lng, anilloDe(c.layer)); });
+  return r.map(c => c.nombre).join(' / ');
+}
+
+function reseleccionarPorCuadrantes(msg) {
+  const capas = cuadrantes.filter(c => c.capa === capaActiva).map(c => c.layer);
+  seleccion = new Set();
+  capas.forEach(c => { const anillo = c.getLatLngs()[0].map(p => [p.lat, p.lng]); filas.forEach(f => { if (f._vis && f._ok && puntoEnPoligono(f._lat, f._lng, anillo)) seleccion.add(f._i); }); });
+  pintar(); actualizarSeleccion();
+  aviso(`${msg}: quedaron seleccionados ${seleccion.size} clientes dentro de ${capas.length} cuadrante(s)`, 5000);
+}
+
+/* ---------- filtros ---------- */
+function unicos(campo) { return [...new Set(filas.map(f => f[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')); }
+function contar(campo) { const c = {}; filas.forEach(f => c[f[campo]] = (c[f[campo]] || 0) + 1); return c; }
+
+function checks(id, valores, conteo, etiqueta, color) {
+  const cont = document.getElementById(id); cont.innerHTML = '';
+  valores.forEach(v => {
+    const l = document.createElement('label'); l.className = 'fila';
+    l.innerHTML = `<input type="checkbox" value="${v}" checked>${color ? `<span class="punto" style="background:${color(v)}"></span>` : ''}<span>${etiqueta ? etiqueta(v) : v}</span><span class="cnt">${(conteo[v] || 0).toLocaleString('es-AR')}</span>`;
+    l.querySelector('input').addEventListener('change', () => aplicarFiltros());
+    cont.appendChild(l);
+  });
+}
+function opciones(id, valores, primero = 'Todos') {
+  const s = document.getElementById(id), actual = s.value;
+  s.innerHTML = `<option value="">${primero}</option>` + valores.map(v => `<option>${v}</option>`).join('');
+  if (valores.includes(actual)) s.value = actual;
+}
+function vendedorDisma(f) { return f.vendedor_disma ? (f.vendedor_disma + (f.vendedor_disma_nombre ? ' ' + f.vendedor_disma_nombre : '')) : ''; }
+
+function armarFiltros() {
+  filas.forEach(f => f._vd = vendedorDisma(f));
+  const cats = ['AUTOSERVICIOS', 'MAYORISTAS', 'PERFUPANA', 'RESTO'].filter(c => filas.some(f => f._cat === c));
+  checks('fCategorias', cats, contar('_cat'), c => CAT_NOMBRE[c] || c, c => CAT_COLOR[c]);
+  checks('fAcciones', unicos('accion'), contar('accion'));
+  checks('fPartidos', unicos('partido'), contar('partido'));
+  opciones('fVendActual', unicos('_vd'));
+  refrescarListasAsignacion();
+  document.getElementById('aDias').innerHTML = DIAS.map(d => `<label><input type="checkbox" value="${d}">${d.slice(0, 3)}</label>`).join('');
+}
+function refrescarListasAsignacion() {
+  opciones('fVendAsig', unicos('vendedor_asignado'));
+  const dias = [...new Set(filas.flatMap(f => f.dia_visita ? f.dia_visita.split('/') : []))].sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b));
+  opciones('fDia', dias);
+  opciones('fEquipo', unicos('equipo'));
+  document.getElementById('avisoClase').style.display = filas.length && !('clase_autoservicio' in filas[0]) ? 'block' : 'none';
+  const vend = new Set([...unicos('vendedor_asignado'), ...unicos('_vd')]);
+  document.getElementById('listaVendedores').innerHTML = [...vend].map(v => `<option value="${v}">`).join('');
+}
+const marcados = id => new Set([...document.querySelectorAll(`#${id} input:checked`)].map(i => i.value));
+
+function pasaFiltros(f) {
+  if (!marcados_cache.cat.has(f._cat)) return false;
+  if (!marcados_cache.acc.has(f.accion)) return false;
+  if (!marcados_cache.par.has(f.partido)) return false;
+  const va = document.getElementById('fVendActual').value; if (va && f._vd !== va) return false;
+  const as = document.getElementById('fAsig').value;
+  if (as === 'sin' && f.vendedor_asignado) return false;
+  if (as === 'con' && !f.vendedor_asignado) return false;
+  const vs = document.getElementById('fVendAsig').value; if (vs && f.vendedor_asignado !== vs) return false;
+  const di = document.getElementById('fDia').value; if (di && !f.dia_visita.split('/').includes(di)) return false;
+  const eq = document.getElementById('fEquipo').value; if (eq && f.equipo !== eq) return false;
+  const cl = document.getElementById('fClase').value; if (cl && !cl.includes(f.clase_autoservicio || '-')) return false;
+  if (document.getElementById('fRevisar').checked && !f._rev) return false;
+  const tx = document.getElementById('fTexto').value.trim().toUpperCase();
+  if (tx && !((f.nombre || '') + ' ' + (f.codigo_cliente || '') + ' ' + (f.direccion || '') + ' ' + (f.localidad || '')).toUpperCase().includes(tx)) return false;
+  return true;
+}
+let marcados_cache = {};
+function aplicarFiltros(encuadrar = false) {
+  marcados_cache = { cat: marcados('fCategorias'), acc: marcados('fAcciones'), par: marcados('fPartidos') };
+  let n = 0, monto = 0; const visibles = [];
+  filas.forEach((f, i) => {
+    f._vis = pasaFiltros(f);
+    if (f._vis) { n++; monto += f._total; if (f._ok) visibles.push(marcadores[i]); }
+  });
+  capaPuntos.clearLayers(); visibles.forEach(m => capaPuntos.addLayer(m));
+  document.getElementById('kVisibles').textContent = n.toLocaleString('es-AR');
+  document.getElementById('kVisiblesMonto').textContent = `· compran ${fmtM(monto / 3)} por mes`;
+  if (encuadrar && visibles.length) mapa.fitBounds(L.featureGroup(visibles).getBounds(), { padding: [20, 20] });
+}
+
+/* ---------- mapa ---------- */
+function iniciarMapa() {
+  mapa = L.map('mapa', { preferCanvas: true }).setView([-34.52, -58.75], 10);
+  /* Los mapas de OpenStreetMap y Carto se bloquean al abrir la página desde un archivo local; Esri no. */
+  const calles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, HERE, Garmin, OpenStreetMap' }).addTo(mapa);
+  const claro = L.layerGroup([
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, attribution: 'Esri' }),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 })]);
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri World Imagery' });
+  const lim = L.layerGroup();
+  Object.entries(PARTIDOS).forEach(([n, coords]) => {
+    L.polygon(coords, { color: '#374151', weight: 2, dashArray: '6 4', fill: false, interactive: false }).addTo(lim);
+    const c = coords.reduce((a, p) => [a[0] + p[0] / coords.length, a[1] + p[1] / coords.length], [0, 0]);
+    if (!n.includes('continente')) L.tooltip({ permanent: true, direction: 'center', className: 'etq-partido' }).setLatLng(c).setContent(n).addTo(lim);
+  });
+  lim.addTo(mapa);
+  L.control.layers({ 'Calles': calles, 'Calles claro': claro, 'Satélite': L.layerGroup([sat, L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })]) }, { 'Límites de partido (aprox.)': lim }, { collapsed: false }).addTo(mapa);
+  L.control.scale({ imperial: false }).addTo(mapa);
+  renderer = L.canvas({ padding: 0.5, tolerance: 4 });
+  capaPuntos = L.layerGroup().addTo(mapa);
+  capaCuadrantes = new L.FeatureGroup().addTo(mapa);
+  capaEtiquetas = L.layerGroup().addTo(mapa);
+  if (!L.Control || !L.Control.Draw) { aviso('No cargó la herramienta de dibujo (revisá internet). Podés usar los filtros y "Seleccionar visibles".', 8000); return; }
+  try {
+  L.drawLocal.draw.toolbar.buttons.rectangle = 'Dibujar un rectángulo para seleccionar';
+  L.drawLocal.draw.toolbar.buttons.polygon = 'Dibujar un polígono para seleccionar (clic en cada vértice, clic en el primero para cerrar)';
+  L.drawLocal.draw.handlers.rectangle.tooltip.start = 'Clic y arrastrá para dibujar el rectángulo';
+  L.drawLocal.draw.handlers.polygon.tooltip.start = 'Clic para empezar el polígono';
+  L.drawLocal.draw.handlers.polygon.tooltip.cont = 'Clic para seguir dibujando';
+  L.drawLocal.draw.handlers.polygon.tooltip.end = 'Clic en el primer punto para cerrar';
+  L.drawLocal.draw.toolbar.actions.text = 'Cancelar';
+  L.drawLocal.draw.toolbar.finish.text = 'Terminar';
+  L.drawLocal.draw.toolbar.undo.text = 'Borrar último punto';
+  L.drawLocal.edit.toolbar.buttons.edit = 'Modificar los cuadrantes dibujados (mover vértices)';
+  L.drawLocal.edit.toolbar.buttons.editDisabled = 'No hay cuadrantes para modificar';
+  L.drawLocal.edit.toolbar.actions.save.text = 'Guardar';
+  L.drawLocal.edit.toolbar.actions.cancel.text = 'Cancelar';
+  L.drawLocal.edit.handlers.edit.tooltip.text = 'Arrastrá los cuadraditos blancos para mover los vértices.';
+  L.drawLocal.edit.handlers.edit.tooltip.subtext = 'Después tocá Guardar (arriba a la izquierda).';
+  L.drawLocal.edit.toolbar.buttons.remove = 'Borrar cuadrantes (tocá los que querés borrar y después Guardar)';
+  L.drawLocal.edit.toolbar.buttons.removeDisabled = 'No hay cuadrantes para borrar';
+  L.drawLocal.edit.toolbar.actions.clearAll.text = 'Borrar todos';
+  L.drawLocal.edit.handlers.remove.tooltip.text = 'Tocá un cuadrante para borrarlo';
+  mapa.on(L.Draw.Event.DELETED, e => {
+    const borrar = []; e.layers.eachLayer(l => borrar.push(l));
+    cuadrantes = cuadrantes.filter(c => !borrar.includes(c.layer));
+    mostrarCuadrantes(); guardarCuadrantes(); listaCuadrantes();
+    aviso(`Se borraron ${borrar.length} cuadrante(s)`);
+  });
+  ctrlDraw = new L.Control.Draw({
+    position: 'topleft',
+    draw: { polyline: false, circle: false, marker: false, circlemarker: false,
+            rectangle: { shapeOptions: { color: '#111827', weight: 2, fillOpacity: 0.05, interactive: false } },
+            polygon: { allowIntersection: false, shapeOptions: { color: '#111827', weight: 2, fillOpacity: 0.05, interactive: false } } },
+    edit: { featureGroup: capaCuadrantes, remove: false }
+  });
+  mapa.addControl(ctrlDraw);
+  mapa.on(L.Draw.Event.EDITED, () => { cuadrantes.forEach(moverEtiqueta); guardarCuadrantes(); reseleccionarPorCuadrantes('Cuadrantes modificados'); });
+  mapa.on(L.Draw.Event.CREATED, e => {
+    const capa = e.layer;
+    agregarCuadrante(capaActiva, null, capa); guardarCuadrantes(); listaCuadrantes();
+    const anillo = capa.getLatLngs()[0].map(p => [p.lat, p.lng]);
+    const dentro = filas.filter(f => f._vis && f._ok && puntoEnPoligono(f._lat, f._lng, anillo)).map(f => f._i);
+    const modo = document.querySelector('input[name=modo]:checked').value;
+    if (modo === 'reemplazar') seleccion = new Set(dentro);
+    else if (modo === 'agregar') dentro.forEach(i => seleccion.add(i));
+    else dentro.forEach(i => seleccion.delete(i));
+    pintar(); actualizarSeleccion();
+    aviso(`${dentro.length} clientes visibles dentro del cuadrante`);
+  });
+  } catch (err) { console.error(err); aviso('La herramienta de dibujo dio error: ' + err.message, 8000); }
+}
+function puntoEnPoligono(lat, lng, anillo) {
+  let dentro = false;
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const [yi, xi] = anillo[i], [yj, xj] = anillo[j];
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/* ---------- color fijo por vendedor ---------- */
+const normVend = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^[\s\d.-]+/, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+// vendedor que atiende al cliente: el asignado en el mapa; si no tiene, el actual de Disma (solo clientes que quedan)
+const vendDe = f => f.vendedor_asignado || (f.accion === 'QUEDA' ? f._vd : '');
+let COLORES_VEND = {}; try { COLORES_VEND = JSON.parse(localStorage.getItem('disma_colores_vendedor') || '{}'); } catch (e) {}
+const PALETA_VEND = Array.from({ length: 48 }, (_, i) => `hsl(${Math.round((i * 137.508) % 360)}, ${i % 3 === 0 ? 75 : i % 3 === 1 ? 60 : 85}%, ${i % 2 ? 38 : 50}%)`);
+function hslAHex(c) { const d = document.createElement('div'); d.style.color = c; document.body.appendChild(d); const m = getComputedStyle(d).color.match(/\d+/g); d.remove(); return '#' + m.slice(0, 3).map(x => (+x).toString(16).padStart(2, '0')).join(''); }
+function colorVend(nombre) {
+  const k = normVend(nombre); if (!k) return null;
+  if (!COLORES_VEND[k]) {
+    const usados = new Set(Object.values(COLORES_VEND));
+    const libre = PALETA_VEND.map(hslAHex).find(c => !usados.has(c)) || PALETA_VEND[Object.keys(COLORES_VEND).length % PALETA_VEND.length];
+    COLORES_VEND[k] = libre;
+    try { localStorage.setItem('disma_colores_vendedor', JSON.stringify(COLORES_VEND)); } catch (e) {}
+  }
+  return COLORES_VEND[k];
+}
+function cambiarColorVend(k, c) { COLORES_VEND[k] = c; try { localStorage.setItem('disma_colores_vendedor', JSON.stringify(COLORES_VEND)); } catch (e) {} pintar(); }
+
+function colorDe(f) {
+  const por = document.getElementById('colorPor').value;
+  if (por === 'vendedor') return colorVend(vendDe(f)) || '#d1d5db';
+  if (por === 'categoria') return CAT_COLOR[f._cat] || '#6b7280';
+  if (por === 'accion') return f.accion === 'QUEDA' ? '#1f3864' : f.accion === 'ENTRA' ? '#f59e0b' : '#9ca3af';
+  if (por === 'clase_autoservicio') return ({A:'#15803d', B:'#eab308', C:'#dc2626'})[f.clase_autoservicio] || '#d1d5db';
+  const v = por === 'vendedor_disma' ? f._vd : por === 'dia_visita' ? (f.dia_visita || '').split('/')[0] : f[por];
+  if (!v) return '#d1d5db';
+  return PALETA[valoresColor.indexOf(v) % PALETA.length];
+}
+let valoresColor = [];
+let marcarNuevos = true;
+function calcularValoresColor() {
+  const por = document.getElementById('colorPor').value;
+  if (por === 'vendedor_disma') valoresColor = unicos('_vd');
+  else if (por === 'dia_visita') valoresColor = DIAS.slice();
+  else if (por === 'categoria' || por === 'accion' || por === 'clase_autoservicio' || por === 'vendedor') valoresColor = [];
+  else valoresColor = unicos(por);
+}
+function leyenda() {
+  const por = document.getElementById('colorPor').value, el = document.getElementById('leyenda');
+  let items = [];
+  if (por === 'categoria') items = Object.keys(CAT_COLOR).map(k => [CAT_COLOR[k], CAT_NOMBRE[k]]);
+  else if (por === 'accion') items = [['#1f3864', 'Queda (Disma)'], ['#f59e0b', 'Entra (nuevo)'], ['#9ca3af', 'Otros']];
+  else if (por === 'clase_autoservicio') items = [['#15803d', 'Autoservicio A'], ['#eab308', 'Autoservicio B'], ['#dc2626', 'Autoservicio C'], ['#d1d5db', 'No es autoservicio']];
+  else if (por === 'vendedor') {
+    const g = {};
+    filas.forEach(f => { const v = vendDe(f); const k = normVend(v); if (!k) return; const x = g[k] = g[k] || { nombre: v.replace(/^[\s\d.-]+/, ''), quedan: 0, nuevos: 0 }; if (f.accion === 'ENTRA') x.nuevos++; else x.quedan++; });
+    const sinAsig = filas.filter(f => !normVend(vendDe(f))).length;
+    const filasL = Object.entries(g).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre, 'es')).map(([k, x]) =>
+      `<div class="fila" style="gap:6px"><input type="color" value="${colorVend(x.nombre)}" data-k="${k}" title="Cambiar color" style="width:22px;height:18px;padding:0;border:none;background:none;cursor:pointer"><span style="flex:1">${x.nombre}</span><span class="mini" title="de Disma · nuevos agregados">${x.quedan} Disma · <b>${x.nuevos} nuevos</b></span></div>`).join('');
+    el.innerHTML = `<div class="mini" style="margin-bottom:4px">Color = vendedor asignado en el mapa o, si no tiene, el vendedor actual de Disma. Tocá el cuadradito para cambiar el color.</div>${filasL}<div class="fila"><span class="punto" style="background:#d1d5db"></span>Sin vendedor (${sinAsig}, nuevos sin asignar)</div>` +
+      (marcarNuevos ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo que le agregás</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente que ya es de Disma</div>' : '');
+    el.querySelectorAll('input[type=color]').forEach(i => i.addEventListener('change', e => cambiarColorVend(e.target.dataset.k, e.target.value)));
+    return;
+  }
+  else { items = valoresColor.slice(0, 40).map((v, i) => [PALETA[i % PALETA.length], v]); items.push(['#d1d5db', 'Sin dato']); }
+  el.innerHTML = items.map(([c, t]) => `<div class="fila"><span class="punto" style="background:${c}"></span>${t}</div>`).join('') + (marcarNuevos && por !== 'accion' ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo (entra)</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente de Disma (queda)</div>' : '') + (por !== 'categoria' && valoresColor.length > 20 ? '<div class="mini">Con más de 20 valores los colores se repiten.</div>' : '');
+}
+
+function crearMarcadores() {
+  calcularValoresColor();
+  marcadores = filas.map(f => {
+    const m = L.circleMarker([f._ok ? f._lat : 0, f._ok ? f._lng : 0], { renderer, radius: 5, weight: 1, color: '#1f2933', fillColor: colorDe(f), fillOpacity: 0.85 });
+    m.bindPopup(() => popup(f), { maxWidth: 320 });
+    m._fila = f;
+    return m;
+  });
+  pintar();
+}
+function pintar() {
+  calcularValoresColor();
+  marcadores.forEach((m, i) => {
+    const f = filas[i], sel = seleccion.has(i);
+    const nuevo = marcarNuevos && f.accion === 'ENTRA';
+    m.setStyle({ fillColor: colorDe(f), fillOpacity: 0.9, radius: sel ? 7 : (f._rev || nuevo ? 6.5 : 5), weight: sel || f._rev ? 3 : nuevo ? 3 : 1,
+                 color: sel ? '#facc15' : f._rev ? '#f97316' : nuevo ? '#000000' : '#ffffff' });
+  });
+  leyenda();
+}
+function popup(f) {
+  const s = seleccion.has(f._i);
+  const div = document.createElement('div');
+  div.innerHTML = `<b>${f.nombre || ''}</b><br>${f.direccion || ''}<br>${f.localidad || ''} · ${f.partido || ''}<br>
+    ${f.rubro || ''} (${CAT_NOMBRE[f._cat] || f._cat}${f.clase_autoservicio ? ' ' + f.clase_autoservicio : ''}) · ${f.accion || ''} · ${f.sistema || ''} ${f.codigo_cliente || ''}<br>
+    Total comprado (3 meses): <b>${fmt(f._total)}</b><br>
+    ${f.proyeccion_disma_mes !== undefined && f.proyeccion_disma_mes !== '' ? `Venta posible Disma: <b>${fmt(num(f.proyeccion_disma_mes))}</b> por mes<br>` : ''}
+    Vendedor Disma actual: ${f._vd || '—'}<br>
+    Teléfono: ${f.telefono_1 || '—'}${f.telefono_2 ? ' / ' + f.telefono_2 : ''}<br>
+    <span style="color:#1f3864">Asignado: <b>${f.vendedor_asignado || '—'}</b> · ${f.dia_visita || '—'} · ${f.equipo || '—'}</span>
+    ${f.alertas ? `<br><span style="color:#b42318">${f.alertas}</span>` : ''}<br>`;
+  const b = document.createElement('button'); b.textContent = s ? 'Sacar de la selección' : 'Sumar a la selección'; b.style.marginTop = '6px';
+  b.onclick = () => { s ? seleccion.delete(f._i) : seleccion.add(f._i); pintar(); actualizarSeleccion(); mapa.closePopup(); };
+  div.appendChild(b);
+  const q = encodeURIComponent([f.direccion, f.localidad, f.partido, 'Buenos Aires'].filter(Boolean).join(', '));
+  const lk = document.createElement('div'); lk.style.marginTop = '6px';
+  lk.innerHTML = `${f._rev ? '<b style="color:#c2410c">⚠ Ubicación a revisar</b><br>' : ''}${f.ubicacion_corregida === 'SI' ? '<span style="color:#15803d">✓ Ubicación corregida a mano</span><br>' : ''}<a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank">Ver la dirección en Google Maps</a>`;
+  const bc = document.createElement('button'); bc.textContent = 'Corregir ubicación'; bc.style.marginTop = '6px'; bc.style.marginLeft = '6px';
+  bc.onclick = () => corregirUbicacion(f);
+  div.appendChild(bc); div.appendChild(lk);
+  return div;
+}
+
+/* ---------- selección y asignación ---------- */
+function actualizarSeleccion() {
+  const sel = [...seleccion].map(i => filas[i]);
+  document.getElementById('kSel').textContent = sel.length.toLocaleString('es-AR');
+  const porCat = {}; let monto = 0;
+  let proy = 0; sel.forEach(f => { porCat[f._cat] = (porCat[f._cat] || 0) + 1; monto += f._total; proy += num(f.proyeccion_disma_mes); });
+  document.getElementById('kSelDet').textContent = sel.length ? `· compran ${fmtM(monto / 3)}/mes · venta posible Disma ${fmtM(proy)}/mes · ` + Object.entries(porCat).map(([c, n]) => `${CAT_NOMBRE[c] || c}: ${n}`).join(' · ') : '';
+  document.getElementById('btnAsignar').disabled = !sel.length;
+  document.getElementById('btnQuitarAsig').disabled = !sel.length;
+}
+function asignar(quitar) {
+  const vend = document.getElementById('aVendedor').value.trim();
+  const dias = [...document.querySelectorAll('#aDias input:checked')].map(i => i.value).join('/');
+  const eqSel = document.getElementById('aEquipo').value;
+  if (!quitar && !vend && !dias && eqSel === '__no') { aviso('Completá el vendedor, el día o el equipo.'); return; }
+  const cambios = [];
+  seleccion.forEach(i => {
+    const f = filas[i];
+    cambios.push([i, f.equipo, f.vendedor_asignado, f.dia_visita]);
+    if (quitar) { f.equipo = ''; f.vendedor_asignado = ''; f.dia_visita = ''; return; }
+    if (vend) f.vendedor_asignado = vend;
+    if (dias) f.dia_visita = dias;
+    if (eqSel === '__auto') f.equipo = EQUIPO_AUTO[f._cat] || 'Call center';
+    else if (eqSel !== '__no') f.equipo = eqSel;
+  });
+  historial.push(cambios); if (historial.length > 30) historial.shift();
+  document.getElementById('btnDeshacer').disabled = false;
+  guardar(); refrescarListasAsignacion(); aplicarFiltros(); pintar(); resumen();
+  aviso(quitar ? `Se quitó la asignación a ${cambios.length} clientes` : `Asignados ${cambios.length} clientes${vend ? ' a ' + vend : ''}${dias ? ' · ' + dias : ''}`);
+}
+function deshacer() {
+  const cambios = historial.pop(); if (!cambios) return;
+  cambios.forEach(([i, e, v, d]) => { filas[i].equipo = e; filas[i].vendedor_asignado = v; filas[i].dia_visita = d; });
+  document.getElementById('btnDeshacer').disabled = !historial.length;
+  guardar(); refrescarListasAsignacion(); aplicarFiltros(); pintar(); resumen();
+  aviso('Se deshizo la última asignación');
+}
+function guardar() {
+  const g = {};
+  filas.forEach(f => { if (f.vendedor_asignado || f.dia_visita || f.equipo) g[f._k] = { e: f.equipo, v: f.vendedor_asignado, d: f.dia_visita }; });
+  try { localStorage.setItem(CLAVE_LS, JSON.stringify(g)); } catch (e) {}
+}
+function resumen() {
+  const r = {};
+  filas.forEach(f => {
+    if (!f.vendedor_asignado) return;
+    const x = r[f.vendedor_asignado] = r[f.vendedor_asignado] || { n: 0, m: 0, d: {} };
+    x.n++; x.m += f._total; (f.dia_visita || '').split('/').filter(Boolean).forEach(d => x.d[d] = (x.d[d] || 0) + 1);
+  });
+  const sinAsig = filas.filter(f => !f.vendedor_asignado).length;
+  const tb = document.querySelector('#tResumen tbody');
+  tb.innerHTML = Object.entries(r).sort((a, b) => b[1].m - a[1].m).map(([v, x]) =>
+    `<tr class="clic" data-v="${v.replace(/"/g, '&quot;')}"><td>${v}</td><td class="num">${x.n}</td><td class="num">${fmtM(x.m / 3)}</td><td>${DIAS.filter(d => x.d[d]).map(d => d.slice(0, 2) + ' ' + x.d[d]).join(' · ')}</td></tr>`).join('') +
+    `<tr><td class="mini">Sin asignar</td><td class="num mini">${sinAsig}</td><td></td><td></td></tr>`;
+  tb.querySelectorAll('tr.clic').forEach(tr => tr.onclick = () => {
+    document.getElementById('fVendAsig').value = tr.dataset.v; aplicarFiltros(true);
+  });
+}
+
+/* ---------- exportar ---------- */
+function filasExport() {
+  const solo = document.querySelector('input[name=exp]:checked').value === 'visibles';
+  // las columnas de la asignacion van primero, y los clientes asignados arriba (por vendedor y dia)
+  const primeras = ['vendedor_asignado', 'dia_visita', 'equipo', 'cuadrante'];
+  const cols = [...primeras, ...columnas.filter(c => !primeras.includes(c)), 'ubicacion_corregida'];
+  filas.forEach(f => f.cuadrante = cuadranteDeCliente(f));
+  const datos = filas.filter(f => !solo || f._vis).sort((a, b) =>
+      (a.vendedor_asignado ? 0 : 1) - (b.vendedor_asignado ? 0 : 1)
+      || String(a.vendedor_asignado || '').localeCompare(String(b.vendedor_asignado || ''))
+      || String(a.dia_visita || '').localeCompare(String(b.dia_visita || ''))
+      || b._total - a._total).map(f => cols.map(c => f[c] ?? ''));
+  return { cols, datos };
+}
+const nombreSalida = ext => `base_disma_asignada_${new Date().toISOString().slice(0, 10)}.${ext}`;
+function descargar(blob, nombre) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function bajarCSV() {
+  const { cols, datos } = filasExport();
+  const esc = v => { const s = String(v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const txt = '﻿' + [cols, ...datos].map(r => r.map(esc).join(';')).join('\r\n');
+  descargar(new Blob([txt], { type: 'text/csv;charset=utf-8' }), nombreSalida('csv'));
+  aviso(`CSV con ${datos.length} clientes (separado por punto y coma, abre directo en Excel)`);
+}
+function bajarXLSX() {
+  if (typeof XLSX === 'undefined') { aviso('No se pudo cargar la librería de Excel (¿sin internet?). Bajalo como CSV.'); return; }
+  const { cols, datos } = filasExport();
+  const numericas = new Set(['ranking', 'total_comprado', 'proyeccion_disma_mes', 'log_cerveceria_80072', 'log_bat_78121', 'log_penaflor_71345', 'log_ayudin_pga_01131_00501', 'comprado_disma', 'comprado_logistica', 'comprado_diguo', 'latitud', 'longitud']);
+  const filasXl = datos.map(r => r.map((v, j) => numericas.has(cols[j]) && v !== '' ? num(v) : v));
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...filasXl]);
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: filasXl.length, c: cols.length - 1 } }) };
+  ws['!cols'] = cols.map(c => ({ wch: ['nombre', 'direccion', 'alertas', 'mismo_local_que'].includes(c) ? 36 : c === 'vendedor_asignado' ? 22 : 14 }));
+  const wb = XLSX.utils.book_new();
+  const asig = filasXl.filter(r => r[0] !== '');
+  const wsA = XLSX.utils.aoa_to_sheet([cols, ...asig]);
+  wsA['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(asig.length, 1), c: cols.length - 1 } }) };
+  wsA['!cols'] = ws['!cols'];
+  XLSX.utils.book_append_sheet(wb, wsA, 'Asignados');
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+  const r = {};
+  filas.forEach(f => { const k = (f.equipo || 'Sin equipo') + '||' + (f.vendedor_asignado || 'Sin asignar'); const x = r[k] = r[k] || [0, 0]; x[0]++; x[1] += f._total; });
+  const res = [['Equipo', 'Vendedor asignado', 'Clientes', 'Compra mensual (promedio 3 meses)']].concat(
+    Object.entries(r).sort().map(([k, x]) => [...k.split('||'), x[0], Math.round(x[1] / 3)]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen');
+  const sc = serializarCuadrantes();
+  const hc = [['capa', 'cuadrante', 'clientes_de_la_capa', 'compra_mensual', 'vertices (no modificar)']].concat(sc.cuadrantes.map(q => {
+    const c = cuadrantes.find(x => x.id === q.id), cap = capaDe(q.capa);
+    const cl = clientesEn(c, false).filter(f => !cap.cats || cap.cats.includes(f._cat));
+    return [cap.nombre, q.nombre, cl.length, Math.round(cl.reduce((a, f) => a + f._total, 0) / 3), JSON.stringify(q.pts)];
+  }));
+  hc.push([]); hc.push(['_config', JSON.stringify({ capas: sc.capas, activa: sc.activa })]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hc), 'Cuadrantes');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  descargar(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombreSalida('xlsx'));
+  aviso(`Excel con ${datos.length} clientes · ${asig.length} asignados (hoja "Asignados")`, 6000);
+  aviso(`Excel con ${datos.length} clientes`);
+}
+
+/* ---------- eventos ---------- */
+function eventos() {
+  const caja = document.getElementById('cajaCarga');
+  ['dragover', 'dragenter'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); caja.classList.add('sobre'); }));
+  document.addEventListener('dragleave', () => caja.classList.remove('sobre'));
+  document.addEventListener('drop', e => { e.preventDefault(); caja.classList.remove('sobre'); const f = e.dataTransfer.files[0]; if (f) { document.getElementById('carga').style.display = 'flex'; leerArchivo(f); } });
+  document.getElementById('btnOtroArchivo').onclick = () => { document.getElementById('carga').style.display = 'flex'; };
+  ['fVendActual', 'fAsig', 'fVendAsig', 'fDia', 'fEquipo', 'fClase'].forEach(id => document.getElementById(id).addEventListener('change', () => aplicarFiltros()));
+  document.getElementById('fRevisar').addEventListener('change', () => aplicarFiltros(true));
+  document.getElementById('marcarNuevos').addEventListener('change', e => { marcarNuevos = e.target.checked; pintar(); leyenda(); });
+  let t; document.getElementById('fTexto').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => aplicarFiltros(), 250); });
+  document.getElementById('pTodos').onclick = () => { document.querySelectorAll('#fPartidos input').forEach(i => i.checked = true); aplicarFiltros(); };
+  document.getElementById('pNinguno').onclick = () => { document.querySelectorAll('#fPartidos input').forEach(i => i.checked = false); aplicarFiltros(); };
+  document.getElementById('btnLimpiarFiltros').onclick = () => {
+    document.querySelectorAll('#fCategorias input, #fAcciones input, #fPartidos input').forEach(i => i.checked = true);
+    ['fVendActual', 'fAsig', 'fVendAsig', 'fDia', 'fEquipo', 'fTexto', 'fClase'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fRevisar').checked = false;
+    aplicarFiltros(true);
+  };
+  document.getElementById('colorPor').addEventListener('change', pintar);
+  document.getElementById('btnSelVisibles').onclick = () => { seleccion = new Set(filas.filter(f => f._vis).map(f => f._i)); pintar(); actualizarSeleccion(); };
+  document.getElementById('btnLimpiarSel').onclick = () => { seleccion.clear(); pintar(); actualizarSeleccion(); };
+  const btnBT = document.getElementById('btnBorrarCuadrantes');
+  btnBT.onclick = () => {
+    salirEdicion();
+    if (btnBT.dataset.ok !== '1') { btnBT.dataset.ok = '1'; btnBT.textContent = 'Confirmar: borrar todos los de ' + capaDe(capaActiva).nombre; setTimeout(() => { btnBT.dataset.ok = ''; btnBT.textContent = 'Borrar todos los cuadrantes de la capa'; }, 5000); return; }
+    btnBT.dataset.ok = ''; btnBT.textContent = 'Borrar todos los cuadrantes de la capa';
+    cuadrantes = cuadrantes.filter(c => c.capa !== capaActiva); mostrarCuadrantes(); guardarCuadrantes(); listaCuadrantes();
+    aviso('Se borraron los cuadrantes de la capa ' + capaDe(capaActiva).nombre + ' (la selección no cambia)');
+  };
+  document.getElementById('btnBorrarUltimo').onclick = () => {
+    salirEdicion();
+    const mias = cuadrantes.filter(c => c.capa === capaActiva); if (!mias.length) return;
+    const ult = mias[mias.length - 1]; cuadrantes = cuadrantes.filter(c => c !== ult);
+    mostrarCuadrantes(); guardarCuadrantes(); listaCuadrantes(); reseleccionarPorCuadrantes('Se borró ' + ult.nombre);
+  };
+  document.getElementById('capaActiva').addEventListener('change', e => cambiarCapa(e.target.value));
+  document.getElementById('capaSolo').addEventListener('change', mostrarCuadrantes);
+  document.getElementById('btnNuevaCapa').onclick = nuevaCapa;
+  document.getElementById('btnAsignar').onclick = () => asignar(false);
+  document.getElementById('btnQuitarAsig').onclick = () => asignar(true);
+  document.getElementById('btnDeshacer').onclick = deshacer;
+  document.getElementById('btnCsv').onclick = bajarCSV;
+  document.getElementById('btnXlsx').onclick = bajarXLSX;
+  document.getElementById('btnBorrarGuardado').onclick = () => {
+    if (document.getElementById('btnBorrarGuardado').dataset.ok !== '1') { document.getElementById('btnBorrarGuardado').dataset.ok = '1'; document.getElementById('btnBorrarGuardado').textContent = 'Confirmar: borrar lo guardado (no borra el mapa actual)'; return; }
+    try { localStorage.removeItem(CLAVE_LS); } catch (e) {}
+    document.getElementById('btnBorrarGuardado').dataset.ok = ''; document.getElementById('btnBorrarGuardado').textContent = 'Borrar asignaciones guardadas en este navegador';
+    aviso('Se borraron las asignaciones guardadas en este navegador.');
+  };
+}
+
+/* carga del archivo: se conecta apenas abre la página, aunque el mapa falle */
+document.getElementById('archivo').addEventListener('change', e => { const f = e.target.files[0]; if (f) { estado('Archivo elegido: ' + f.name); leerArchivo(f); } });
+document.getElementById('btnCargar').addEventListener('click', () => leerArchivo(document.getElementById('archivo').files[0]));
+
+(function arrancar() {
+  if (typeof L === 'undefined') { estado('No se pudo cargar el mapa: esta página necesita internet y abrirse en Chrome/Edge desde el archivo descargado (no en la vista previa).'); return; }
+  try { iniciarMapa(); } catch (err) { console.error(err); estado('Error al armar el mapa: ' + err.message); }
+  try { eventos(); resumen(); opcionesCapas(); listaCuadrantes(); } catch (err) { console.error(err); estado('Error al preparar la página: ' + err.message); }
+})();
+</script>
+</body>
+</html>
