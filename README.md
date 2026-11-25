@@ -19,17 +19,13 @@ Las asignaciones y los cuadrantes se guardan en el navegador de cada usuario; pa
 - También se puede colorear por categoría, clase de autoservicio (A/B/C por compra), acción (queda / entra), equipo o día.
 
 ## Publicar con login de Google (Apps Script)
-El mapa se publica como app web de Google Apps Script, que pide iniciar sesión con Google y solo deja entrar a las cuentas de la lista `PERMITIDOS` en `apps_script/Codigo.gs`.
+El mapa se publica como app web de Google Apps Script (cuenta arodriguez@dismitre.com.ar). Pide iniciar sesión con Google y solo deja entrar a las cuentas de la lista `PERMITIDOS` en `apps_script/Codigo.gs`.
+La app lee el `index.html` de este repositorio, así que **cada cambio que se sube a GitHub queda publicado solo** (hasta 10 minutos de demora por la caché).
 
-1. Entrar a https://script.google.com con arodriguez@dismitre.com.ar → **Nuevo proyecto**. Nombre: `Mapa clientes Disma`.
-2. Reemplazar el contenido de `Código.gs` por el de `apps_script/Codigo.gs`.
-3. **+ Archivos → HTML**, nombre `index` (sin .html), y pegar el contenido de `apps_script/index.html`.
-4. **Implementar → Nueva implementación → Tipo: App web**.
-   - Ejecutar como: **Usuario que accede a la app web**.
-   - Quién tiene acceso: **Cualquier usuario con cuenta de Google** (hace falta para cuentas de fuera de dismitre.com.ar, como Gmail). Igual solo entran las cuentas de `PERMITIDOS`.
-5. Autorizar los permisos que pide Google y copiar la **URL de la app web**: ese es el link para el equipo.
+Configuración de la implementación (App web):
+- Ejecutar como: **Usuario que accede a la app web**.
+- Quién tiene acceso: **Cualquier usuario con cuenta de Google** (hace falta para cuentas de fuera de dismitre.com.ar). Igual solo entran las cuentas de `PERMITIDOS`.
 
-Para dar acceso a otra persona: agregar su mail en `PERMITIDOS` y hacer **Implementar → Administrar implementaciones → Editar → Versión nueva**.
-Para actualizar el mapa: pegar el nuevo `index.html` en el archivo `index` y crear una versión nueva de la implementación (la URL no cambia).
+Para dar acceso a otra persona: agregar su mail en `PERMITIDOS` (en Apps Script) y hacer **Implementar → Administrar implementaciones → Editar → Versión nueva**. La URL no cambia.
 
 GitHub Pages no se usa: una página de GitHub Pages es pública y no puede pedir login de Google de forma segura.
