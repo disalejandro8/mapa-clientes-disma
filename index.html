@@ -104,11 +104,11 @@
       <option value="dia_visita">Día de visita</option>
       <option value="equipo">Equipo</option>
       <option value="vendedor_disma">Vendedor Disma actual</option>
-      <option value="accion">Acción (queda / entra)</option>
+      <option value="accion">Acción (queda / recuperar / entra)</option>
       <option value="clase_autoservicio">Clase autoservicio (A / B / C)</option>
     </select>
-    <div class="fila" style="margin-top:6px"><label style="font-weight:600"><input type="checkbox" id="marcarNuevos" checked> Marcar con anillo negro grueso los clientes nuevos (ENTRA)</label></div>
-    <div class="mini">Así ves a la vez la categoría (color de relleno) y si el cliente es nuevo. Los que quedan de Disma tienen borde fino.</div>
+    <div class="fila" style="margin-top:6px"><label style="font-weight:600"><input type="checkbox" id="marcarNuevos" checked> Marcar con anillo negro los nuevos (ENTRA) y violeta los de recuperar</label></div>
+    <div class="mini">Así ves a la vez la categoría (color de relleno) y si el cliente es nuevo. Los que hoy compran a Disma tienen borde fino.</div>
     <div id="leyenda" style="margin-top:6px"></div>
   </aside>
 
@@ -618,7 +618,7 @@ function puntoEnPoligono(lat, lng, anillo) {
 /* ---------- color fijo por vendedor ---------- */
 const normVend = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^[\s\d.-]+/, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
 // vendedor que atiende al cliente: el asignado en el mapa; si no tiene, el actual de Disma (solo clientes que quedan)
-const vendDe = f => f.vendedor_asignado || (f.accion === 'QUEDA' ? f._vd : '');
+const vendDe = f => f.vendedor_asignado || (f.accion === 'QUEDA' || f.accion === 'RECUPERAR' ? f._vd : '');
 let COLORES_VEND = {}; try { COLORES_VEND = JSON.parse(localStorage.getItem('disma_colores_vendedor') || '{}'); } catch (e) {}
 const PALETA_VEND = Array.from({ length: 48 }, (_, i) => `hsl(${Math.round((i * 137.508) % 360)}, ${i % 3 === 0 ? 75 : i % 3 === 1 ? 60 : 85}%, ${i % 2 ? 38 : 50}%)`);
 function hslAHex(c) { const d = document.createElement('div'); d.style.color = c; document.body.appendChild(d); const m = getComputedStyle(d).color.match(/\d+/g); d.remove(); return '#' + m.slice(0, 3).map(x => (+x).toString(16).padStart(2, '0')).join(''); }
@@ -638,7 +638,7 @@ function colorDe(f) {
   const por = document.getElementById('colorPor').value;
   if (por === 'vendedor') return colorVend(vendDe(f)) || '#d1d5db';
   if (por === 'categoria') return CAT_COLOR[f._cat] || '#6b7280';
-  if (por === 'accion') return f.accion === 'QUEDA' ? '#1f3864' : f.accion === 'ENTRA' ? '#f59e0b' : '#9ca3af';
+  if (por === 'accion') return f.accion === 'QUEDA' ? '#1f3864' : f.accion === 'RECUPERAR' ? '#7c3aed' : f.accion === 'ENTRA' ? '#f59e0b' : '#9ca3af';
   if (por === 'clase_autoservicio') return ({A:'#15803d', B:'#eab308', C:'#dc2626'})[f.clase_autoservicio] || '#d1d5db';
   const v = por === 'vendedor_disma' ? f._vd : por === 'dia_visita' ? (f.dia_visita || '').split('/')[0] : f[por];
   if (!v) return '#d1d5db';
@@ -657,21 +657,21 @@ function leyenda() {
   const por = document.getElementById('colorPor').value, el = document.getElementById('leyenda');
   let items = [];
   if (por === 'categoria') items = Object.keys(CAT_COLOR).map(k => [CAT_COLOR[k], CAT_NOMBRE[k]]);
-  else if (por === 'accion') items = [['#1f3864', 'Queda (Disma)'], ['#f59e0b', 'Entra (nuevo)'], ['#9ca3af', 'Otros']];
+  else if (por === 'accion') items = [['#1f3864', 'Queda (compra hoy a Disma)'], ['#7c3aed', 'Recuperar (tiene cuenta Disma, hoy no compra)'], ['#f59e0b', 'Entra (nuevo)'], ['#9ca3af', 'Otros']];
   else if (por === 'clase_autoservicio') items = [['#15803d', 'Autoservicio A'], ['#eab308', 'Autoservicio B'], ['#dc2626', 'Autoservicio C'], ['#d1d5db', 'No es autoservicio']];
   else if (por === 'vendedor') {
     const g = {};
-    filas.forEach(f => { const v = vendDe(f); const k = normVend(v); if (!k) return; const x = g[k] = g[k] || { nombre: v.replace(/^[\s\d.-]+/, ''), quedan: 0, nuevos: 0 }; if (f.accion === 'ENTRA') x.nuevos++; else x.quedan++; });
+    filas.forEach(f => { const v = vendDe(f); const k = normVend(v); if (!k) return; const x = g[k] = g[k] || { nombre: v.replace(/^[\s\d.-]+/, ''), quedan: 0, nuevos: 0, recuperar: 0 }; if (f.accion === 'ENTRA') x.nuevos++; else if (f.accion === 'RECUPERAR') x.recuperar++; else x.quedan++; });
     const sinAsig = filas.filter(f => !normVend(vendDe(f))).length;
     const filasL = Object.entries(g).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre, 'es')).map(([k, x]) =>
-      `<div class="fila" style="gap:6px"><input type="color" value="${colorVend(x.nombre)}" data-k="${k}" title="Cambiar color" style="width:22px;height:18px;padding:0;border:none;background:none;cursor:pointer"><span style="flex:1">${x.nombre}</span><span class="mini" title="de Disma · nuevos agregados">${x.quedan} Disma · <b>${x.nuevos} nuevos</b></span></div>`).join('');
+      `<div class="fila" style="gap:6px"><input type="color" value="${colorVend(x.nombre)}" data-k="${k}" title="Cambiar color" style="width:22px;height:18px;padding:0;border:none;background:none;cursor:pointer"><span style="flex:1">${x.nombre}</span><span class="mini" title="de Disma · cuentas Disma para recuperar · nuevos agregados">${x.quedan} Disma · ${x.recuperar} recuperar · <b>${x.nuevos} nuevos</b></span></div>`).join('');
     el.innerHTML = `<div class="mini" style="margin-bottom:4px">Color = vendedor asignado en el mapa o, si no tiene, el vendedor actual de Disma. Tocá el cuadradito para cambiar el color.</div>${filasL}<div class="fila"><span class="punto" style="background:#d1d5db"></span>Sin vendedor (${sinAsig}, nuevos sin asignar)</div>` +
-      (marcarNuevos ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo que le agregás</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente que ya es de Disma</div>' : '');
+      (marcarNuevos ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo que le agregás</div><div class="fila"><span class="punto" style="background:#fff;border:3px solid #7c3aed;width:10px;height:10px"></span>Anillo violeta = recuperar (tiene cuenta Disma, hoy no compra)</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente que ya es de Disma</div>' : '');
     el.querySelectorAll('input[type=color]').forEach(i => i.addEventListener('change', e => cambiarColorVend(e.target.dataset.k, e.target.value)));
     return;
   }
   else { items = valoresColor.slice(0, 40).map((v, i) => [PALETA[i % PALETA.length], v]); items.push(['#d1d5db', 'Sin dato']); }
-  el.innerHTML = items.map(([c, t]) => `<div class="fila"><span class="punto" style="background:${c}"></span>${t}</div>`).join('') + (marcarNuevos && por !== 'accion' ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo (entra)</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente de Disma (queda)</div>' : '') + (por !== 'categoria' && valoresColor.length > 20 ? '<div class="mini">Con más de 20 valores los colores se repiten.</div>' : '');
+  el.innerHTML = items.map(([c, t]) => `<div class="fila"><span class="punto" style="background:${c}"></span>${t}</div>`).join('') + (marcarNuevos && por !== 'accion' ? '<div class="fila" style="margin-top:4px"><span class="punto" style="background:#fff;border:3px solid #000;width:10px;height:10px"></span>Anillo negro = cliente nuevo (entra)</div><div class="fila"><span class="punto" style="background:#fff;border:3px solid #7c3aed;width:10px;height:10px"></span>Anillo violeta = recuperar (cuenta Disma sin compras)</div><div class="fila"><span class="punto" style="background:#9ca3af;border:1px solid #fff"></span>Borde fino = cliente de Disma (queda)</div>' : '') + (por !== 'categoria' && valoresColor.length > 20 ? '<div class="mini">Con más de 20 valores los colores se repiten.</div>' : '');
 }
 
 function crearMarcadores() {
@@ -688,9 +688,9 @@ function pintar() {
   calcularValoresColor();
   marcadores.forEach((m, i) => {
     const f = filas[i], sel = seleccion.has(i);
-    const nuevo = marcarNuevos && f.accion === 'ENTRA';
-    m.setStyle({ fillColor: colorDe(f), fillOpacity: 0.9, radius: sel ? 7 : (f._rev || nuevo ? 6.5 : 5), weight: sel || f._rev ? 3 : nuevo ? 3 : 1,
-                 color: sel ? '#facc15' : f._rev ? '#f97316' : nuevo ? '#000000' : '#ffffff' });
+    const nuevo = marcarNuevos && f.accion === 'ENTRA', recu = marcarNuevos && f.accion === 'RECUPERAR';
+    m.setStyle({ fillColor: colorDe(f), fillOpacity: 0.9, radius: sel ? 7 : (f._rev || nuevo || recu ? 6.5 : 5), weight: sel || f._rev || nuevo || recu ? 3 : 1,
+                 color: sel ? '#facc15' : f._rev ? '#f97316' : nuevo ? '#000000' : recu ? '#7c3aed' : '#ffffff' });
   });
   leyenda();
 }
@@ -704,6 +704,7 @@ function popup(f) {
     Vendedor Disma actual: ${f._vd || '—'}<br>
     Teléfono: ${f.telefono_1 || '—'}${f.telefono_2 ? ' / ' + f.telefono_2 : ''}<br>
     <span style="color:#1f3864">Asignado: <b>${f.vendedor_asignado || '—'}</b> · ${f.dia_visita || '—'} · ${f.equipo || '—'}</span>
+    ${f.ex_cliente_disma ? `<br><span style="color:#7c3aed">${f.ex_cliente_disma}</span>` : ''}
     ${f.alertas ? `<br><span style="color:#b42318">${f.alertas}</span>` : ''}<br>`;
   const b = document.createElement('button'); b.textContent = s ? 'Sacar de la selección' : 'Sumar a la selección'; b.style.marginTop = '6px';
   b.onclick = () => { s ? seleccion.delete(f._i) : seleccion.add(f._i); pintar(); actualizarSeleccion(); mapa.closePopup(); };
